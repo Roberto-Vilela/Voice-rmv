@@ -1,0 +1,8 @@
+NAMES                      IMAGE                                     PORTS                     STATUS
+searxng                    docker.io/searxng/searxng:latest          127.0.0.1:9090->8080/tcp  Up 5 hours
+voice-rmv_postgres_1       docker.io/library/postgres:16-alpine      0.0.0.0:5432->5432/tcp    Up 2 minutes (healthy)
+voice-rmv_redis_1          docker.io/library/redis:7-alpine          0.0.0.0:6379->6379/tcp    Up 2 minutes (healthy)
+voice-rmv_celery_worker_1  localhost/voice-rmv_celery_worker:latest                            Up 2 minutes
+voice-rmv_api_1            localhost/voice-rmv_api:latest            0.0.0.0:8456->8456/tcp    Up 2 minutes
+voice-rmv_frontend_1       localhost/voice-rmv_frontend:latest       0.0.0.0:5173->5173/tcp    Up 2 minutes
+afv_postgres               docker.io/library/postgres:16             127.0.0.1:5433->5432/tcp  Up 43 seconds

@@ -1,0 +1,81 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: voice_rmv
+      POSTGRES_PASSWORD: voice_rmv_dev
+      POSTGRES_DB: voice_rmv
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U voice_rmv"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8456:8456"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://voice_rmv:voice_rmv_dev@postgres:5432/voice_rmv
+      REDIS_URL: redis://redis:6379/0
+      OUTPUT_DIR: /output
+      TEMP_DIR: /temp
+    volumes:
+      - shared_output:/output
+      - shared_temp:/temp
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8456
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=1
+    environment:
+      DATABASE_URL: postgresql+asyncpg://voice_rmv:voice_rmv_dev@postgres:5432/voice_rmv
+      REDIS_URL: redis://redis:6379/0
+      OUTPUT_DIR: /output
+      TEMP_DIR: /temp
+    volumes:
+      - shared_output:/output
+      - shared_temp:/temp
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    command: npm run dev -- --host 0.0.0.0
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
+  shared_output:
+  shared_temp:

@@ -1,0 +1,43 @@
+# Dependências
+node_modules/
+frontend/usr/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+*.whl
+
+# Banco de dados local
+*.db
+*.sqlite*
+
+# Diretórios gerados pela aplicação
+output/
+temp/
+frontend/dist/
+frontend/node_modules/.vite/
+
+# Ambiente e segredos
+.env
+stitch-mcp.json
+
+# Notas pessoais do desenvolvedor / agentes
+memory-bank/
+.clinerules/
+.opencode/
+opencode/
+
+# Assets gerados (imagens, etc.)
+Assets/
+
+# Artefatos de teste locais
+teste-*.mp3
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# TypeScript incremental build cache
+*.tsbuildinfo

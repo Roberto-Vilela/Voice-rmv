@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: voice_rmv
+          POSTGRES_PASSWORD: voice_rmv_dev
+          POSTGRES_DB: voice_rmv
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - run: pip install -r backend/requirements.txt
+      - run: pip install pytest httpx pytest-asyncio
+      - run: pytest backend/tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://voice_rmv:voice_rmv_dev@localhost:5432/voice_rmv
+          REDIS_URL: redis://localhost:6379/0
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
