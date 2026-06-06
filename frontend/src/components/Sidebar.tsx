@@ -1,4 +1,5 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
 
 const navItems = [
   { icon: "grid_view", label: "Dashboard", to: "/" },
@@ -8,6 +9,21 @@ const navItems = [
 ];
 
 export default function Sidebar() {
+  const navigate = useNavigate();
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
   return (
     <aside className="hidden md:flex flex-col w-64 h-screen sticky top-0 bg-surface border-r border-outline-variant z-50">
       <div className="p-6 flex items-center gap-3 mb-8">
@@ -47,7 +63,7 @@ export default function Sidebar() {
         ))}
       </nav>
       <div className="p-4 mt-auto border-t border-outline-variant">
-        <div className="flex items-center gap-3 p-2">
+        <div className="relative flex items-center gap-3 p-2" ref={menuRef}>
           <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-primary-container shrink-0">
             <img
               alt="User profile photo"
@@ -63,9 +79,28 @@ export default function Sidebar() {
               Pro Plan
             </p>
           </div>
-          <button className="ml-auto text-on-surface-variant">
+          <button
+            className="ml-auto text-on-surface-variant hover:bg-surface-container p-2 rounded-full transition-colors"
+            onClick={() => setMenuOpen((current) => !current)}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+          >
             <span className="material-symbols-outlined">settings</span>
           </button>
+          {menuOpen && (
+            <div className="absolute right-2 bottom-full mb-2 w-48 rounded-xl border border-outline-variant bg-surface shadow-lg overflow-hidden z-50">
+              <button
+                className="w-full flex items-center gap-3 px-4 py-3 text-left text-label-md text-on-surface hover:bg-surface-container"
+                onClick={() => {
+                  setMenuOpen(false);
+                  navigate("/settings/provider");
+                }}
+              >
+                <span className="material-symbols-outlined text-on-surface-variant text-[18px]">tune</span>
+                Provedor
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </aside>

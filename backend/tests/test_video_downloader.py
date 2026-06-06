@@ -68,12 +68,12 @@ def test_download_video_progress_hook():
     mock_ydl.extract_info.return_value = {"id": "abc123", "title": "", "duration": 0}
     mock_ydl.prepare_filename.return_value = "/tmp/video/abc123.mp4"
 
-    with patch("app.services.video_downloader.yt_dlp.YoutubeDL", return_value=mock_ydl):
+    with patch("app.services.video_downloader.yt_dlp.YoutubeDL", return_value=mock_ydl) as mock_cls:
         from app.services.video_downloader import download_video
 
         download_video("https://example.com/v", "/tmp/video", on_progress=on_progress)
 
-        opts = mock_ydl.call_args[0][0]
+        opts = mock_cls.call_args[0][0]
         hook = opts["progress_hooks"][0]
 
         hook({"status": "downloading", "total_bytes": 100, "downloaded_bytes": 50})

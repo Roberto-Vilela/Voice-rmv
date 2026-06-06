@@ -8,7 +8,7 @@ from app.config import settings
 engine = create_async_engine(settings.database_url, echo=False)
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
-sync_engine = create_engine(settings.database_url.replace("+aiosqlite", ""))
+sync_engine = create_engine(settings.database_url.replace("+asyncpg", "+psycopg2"))
 sync_session = Session(sync_engine)
 
 

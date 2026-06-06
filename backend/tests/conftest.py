@@ -5,6 +5,8 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.main import app
+from app.routers.narrate import get_db as narrate_get_db
+from app.routers.history import get_db as history_get_db
 
 
 @pytest.fixture
@@ -56,7 +58,7 @@ def mock_db_session():
     task_mock.type = "text"
     task_mock.status = "completed"
     task_mock.progress = 100
-    task_mock.voice = "pt-BR-FranciscaNeural"
+    task_mock.voice = "en-US-AriaNeural"
     task_mock.input_text = "test"
     task_mock.input_url = None
     task_mock.input_file = None
@@ -64,6 +66,7 @@ def mock_db_session():
     task_mock.audio_path = "/tmp/output/narrations/audio.mp3"
     task_mock.duration_seconds = 3.0
     task_mock.error = None
+    task_mock.extra_data = None
     task_mock.created_at = datetime.now(timezone.utc)
     task_mock.updated_at = datetime.now(timezone.utc)
 
@@ -77,12 +80,24 @@ def mock_db_session():
 
 @pytest.fixture(autouse=True)
 def override_get_db(mock_db_session):
-    with (
-        patch("app.routers.narrate.get_db") as mock_narrate_db,
-        patch("app.routers.history.get_db") as mock_history_db,
+    async def _get_db():
+        yield mock_db_session
+
+    app.dependency_overrides[narrate_get_db] = _get_db
+    app.dependency_overrides[history_get_db] = _get_db
+    yield
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def mock_voice_listing():
+    with patch(
+        "app.main.list_voices",
+        new=AsyncMock(return_value=[
+            {"name": "en-US-AriaNeural", "locale": "en-US", "gender": "Female"},
+            {"name": "en-US-AriaNeural", "locale": "en-US", "gender": "Female"},
+        ]),
     ):
-        mock_narrate_db.return_value.__aenter__.return_value = mock_db_session
-        mock_history_db.return_value.__aenter__.return_value = mock_db_session
         yield
 
 
@@ -93,6 +108,6 @@ def mock_transcriber():
             "text": "texto transcrito",
             "segments": [{"start": 0.0, "end": 1.0, "text": "texto transcrito"}],
             "duration": 2.5,
-            "language": "pt",
+            "language": "en",
         }
         yield mock

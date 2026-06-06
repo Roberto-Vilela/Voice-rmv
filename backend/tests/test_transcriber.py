@@ -13,7 +13,7 @@ def mock_whisper_model():
 
     info = MagicMock()
     info.duration = 2.5
-    info.language = "pt"
+    info.language = "en"
 
     model.transcribe.return_value = ([segment], info)
     return model
@@ -29,9 +29,9 @@ def test_transcribe_returns_correct_structure(mock_whisper_model):
         assert len(result["segments"]) == 1
         assert result["segments"][0]["text"] == "olá mundo teste"
         assert result["duration"] == 2.5
-        assert result["language"] == "pt"
+        assert result["language"] == "en"
 
-        mock_whisper_model.transcribe.assert_called_once_with("/fake/path.wav", language="pt")
+        mock_whisper_model.transcribe.assert_called_once_with("/fake/path.wav", task="transcribe")
 
 
 def test_transcribe_calls_get_model(mock_whisper_model):
@@ -45,7 +45,7 @@ def test_transcribe_calls_get_model(mock_whisper_model):
 
 def test_transcribe_empty_audio():
     model = MagicMock()
-    model.transcribe.return_value = ([], MagicMock(duration=0.0, language="pt"))
+    model.transcribe.return_value = ([], MagicMock(duration=0.0, language="en"))
 
     with patch("app.services.transcriber.get_model", return_value=model):
         from app.services.transcriber import transcribe

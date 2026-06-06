@@ -28,7 +28,22 @@ export async function getTask(taskId: string) {
 }
 
 export async function listTasks() {
-  const { data } = await api.get("/tasks");
+  const { data } = await api.get<{ tasks: any[]; total: number }>("/tasks");
+  return data.tasks;
+}
+
+export async function deleteTask(taskId: string) {
+  const { data } = await api.delete(`/tasks/${taskId}`);
+  return data;
+}
+
+export async function duplicateTask(taskId: string) {
+  const { data } = await api.post(`/tasks/${taskId}/duplicate`);
+  return data;
+}
+
+export async function patchTask(taskId: string, body: { display_name?: string; transcription?: string; extra_data?: Record<string, unknown> }) {
+  const { data } = await api.patch(`/tasks/${taskId}`, body);
   return data;
 }
 

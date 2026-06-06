@@ -1,10 +1,14 @@
 import edge_tts
+import inspect
 
 
-async def synthesize(text: str, voice: str = "pt-BR-FranciscaNeural") -> bytes:
+async def synthesize(text: str, voice: str = "en-US-AriaNeural") -> bytes:
     communicate = edge_tts.Communicate(text, voice)
     audio = b""
-    async for chunk in communicate.stream():
+    stream = communicate.stream()
+    if inspect.isawaitable(stream):
+        stream = await stream
+    async for chunk in stream:
         if chunk["type"] == "audio":
             audio += chunk["data"]
     return audio

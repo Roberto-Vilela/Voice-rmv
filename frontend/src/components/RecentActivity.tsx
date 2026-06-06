@@ -1,15 +1,18 @@
 import { useTasks } from "../api/hooks";
 import { useMemo } from "react";
 import TaskRow from "./TaskRow";
+import type { Task } from "../types";
 
-export default function RecentActivity() {
-  const { data: tasks = [], isLoading } = useTasks();
+interface Props {
+  onSelectTask?: (task: Task) => void;
+}
 
-  const reversedTasks = useMemo(() => {
-    if (Array.isArray(tasks)) {
-      return [...tasks].reverse();
-    }
-    return [];
+export default function RecentActivity({ onSelectTask }: Props) {
+  const { data: tasks = [], isLoading, refetch } = useTasks();
+
+  const recentTasks = useMemo(() => {
+    if (!Array.isArray(tasks)) return [];
+    return [...tasks].slice(0, 5);
   }, [tasks]);
 
   if (isLoading) {
@@ -32,8 +35,8 @@ export default function RecentActivity() {
         </button>
       </div>
       <div className="zebra-striping">
-        {reversedTasks.map((task) => (
-          <TaskRow key={task.id} task={task} />
+        {recentTasks.map((task) => (
+          <TaskRow key={task.id} task={task} onRefetch={refetch} onSelectTask={onSelectTask} />
         ))}
       </div>
     </div>

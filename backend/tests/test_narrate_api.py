@@ -19,7 +19,7 @@ class TestNarrateText:
     async def test_narrate_text_success(self, client, mock_synthesize):
         resp = await client.post(
             "/api/narrate/text",
-            json={"text": "Olá mundo", "voice": "pt-BR-FranciscaNeural"},
+            json={"text": "Olá mundo", "voice": "en-US-AriaNeural"},
         )
 
         assert resp.status_code == 200
@@ -27,11 +27,11 @@ class TestNarrateText:
         assert data["status"] == "completed"
         assert data["progress"] == 100
         assert data["input_text"] == "Olá mundo"
-        assert data["voice"] == "pt-BR-FranciscaNeural"
+        assert data["voice"] == "en-US-AriaNeural"
         assert data["type"] == "text"
         assert data["audio_url"] is not None
         assert data["error"] is None
-        mock_synthesize.assert_awaited_once_with("Olá mundo", "pt-BR-FranciscaNeural")
+        mock_synthesize.assert_awaited_once_with("Olá mundo", "en-US-AriaNeural")
 
     async def test_narrate_text_default_voice(self, client, mock_synthesize):
         resp = await client.post(
@@ -41,7 +41,7 @@ class TestNarrateText:
 
         assert resp.status_code == 200
         data = resp.json()
-        assert data["voice"] == "pt-BR-FranciscaNeural"
+        assert data["voice"] == "en-US-AriaNeural"
 
     async def test_narrate_text_synthesize_error(self, client, mock_synthesize):
         mock_synthesize.side_effect = RuntimeError("Falha no TTS")
@@ -63,7 +63,7 @@ class TestNarrateVideoUrl:
             "/api/narrate/video-url",
             json={
                 "url": "https://youtube.com/watch?v=dQw4w9WgXcQ",
-                "voice": "pt-BR-FranciscaNeural",
+                "voice": "en-US-AriaNeural",
             },
         )
 
@@ -81,14 +81,14 @@ class TestNarrateVideoUrl:
         )
 
         assert resp.status_code == 200
-        assert resp.json()["voice"] == "pt-BR-FranciscaNeural"
+        assert resp.json()["voice"] == "en-US-AriaNeural"
 
 
 class TestNarrateUpload:
     async def test_upload_audio_file(self, client):
         resp = await client.post(
             "/api/narrate/upload",
-            data={"voice": "pt-BR-FranciscaNeural"},
+            data={"voice": "en-US-AriaNeural"},
             files={"file": ("audio.mp3", b"fake audio content", "audio/mpeg")},
         )
 
@@ -101,7 +101,7 @@ class TestNarrateUpload:
     async def test_upload_video_file(self, client):
         resp = await client.post(
             "/api/narrate/upload",
-            data={"voice": "pt-BR-FranciscaNeural"},
+            data={"voice": "en-US-AriaNeural"},
             files={"file": ("video.mp4", b"fake video content", "video/mp4")},
         )
 
@@ -117,7 +117,7 @@ class TestNarrateUpload:
         )
 
         assert resp.status_code == 200
-        assert resp.json()["voice"] == "pt-BR-FranciscaNeural"
+        assert resp.json()["voice"] == "en-US-AriaNeural"
 
 
 class TestGetTask:

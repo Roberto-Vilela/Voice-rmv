@@ -18,8 +18,7 @@ export function useTasks() {
   return useQuery({
     queryKey: ["tasks"],
     queryFn: listTasks,
-    keepPreviousData: true,
-    staleTime: 1000 * 60, // 1 minute
+    staleTime: 1000 * 60,
     refetchOnWindowFocus: false,
   });
 }

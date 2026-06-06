@@ -1,69 +1,172 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { Task } from "../types";
+import { patchTask } from "../api/client";
 
-export default function WaveformPlayer() {
+interface Props {
+  task: Task | null;
+  onTimeUpdate?: (time: number) => void;
+}
+
+function formatTime(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+function displayName(task: Task): string {
+  if (task.extra_data?.display_name) return task.extra_data.display_name;
+  return task.input_file || task.input_text || task.input_url || "Untitled";
+}
+
+export default function WaveformPlayer({ task, onTimeUpdate }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const barsRef = useRef<HTMLDivElement[]>([]);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
-
-    const bars: HTMLDivElement[] = [];
-    const barCount = 100;
-
-    for (let i = 0; i < barCount; i++) {
+    barsRef.current.forEach((b) => b.remove());
+    barsRef.current = [];
+    const count = 100;
+    for (let i = 0; i < count; i++) {
       const bar = document.createElement("div");
       bar.className = "waveform-bar flex-grow bg-secondary-container rounded-t-sm";
       bar.style.height = `${Math.random() * 80 + 20}%`;
       container.appendChild(bar);
-      bars.push(bar);
+      barsRef.current.push(bar);
     }
+  }, [task?.id]);
 
-    const interval = setInterval(() => {
-      bars.forEach((bar) => {
-        bar.style.height = `${Math.random() * 80 + 20}%`;
-      });
-    }, 800);
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | null = null;
+    if (playing) {
+      interval = setInterval(() => {
+        barsRef.current.forEach((bar) => {
+          bar.style.height = `${Math.random() * 80 + 20}%`;
+        });
+      }, 300);
+    }
+    return () => { if (interval) clearInterval(interval); };
+  }, [playing]);
 
-    return () => {
-      clearInterval(interval);
-      bars.forEach((bar) => bar.remove());
+  useEffect(() => {
+    const audio = task?.audio_url ? new Audio(task.audio_url) : null;
+    audioRef.current = audio;
+    setPlaying(false);
+    setCurrentTime(0);
+    setDuration(0);
+    if (!audio) return;
+    const onTime = () => {
+      setCurrentTime(audio.currentTime);
+      onTimeUpdate?.(audio.currentTime);
     };
-  }, []);
+    const onMeta = () => setDuration(audio.duration || 0);
+    const onEnd = () => {
+      setPlaying(false);
+      setCurrentTime(0);
+      onTimeUpdate?.(0);
+    };
+    audio.addEventListener("timeupdate", onTime);
+    audio.addEventListener("loadedmetadata", onMeta);
+    audio.addEventListener("ended", onEnd);
+    return () => {
+      audio.pause();
+      onTimeUpdate?.(0);
+      audio.removeEventListener("timeupdate", onTime);
+      audio.removeEventListener("loadedmetadata", onMeta);
+      audio.removeEventListener("ended", onEnd);
+    };
+  }, [task?.audio_url]);
+
+  const handlePlayPause = () => {
+    if (!task?.audio_url) return;
+    if (!audioRef.current) {
+      audioRef.current = new Audio(task.audio_url);
+    }
+    if (playing) {
+      audioRef.current.pause();
+      setPlaying(false);
+      onTimeUpdate?.(currentTime);
+    } else {
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+    }
+  };
+
+  const handleRename = async () => {
+    if (!task) return;
+    const current = displayName(task);
+    const name = prompt("Rename file:", current);
+    if (name && name !== current) {
+      await patchTask(task.id, { display_name: name });
+      window.location.reload();
+    }
+  };
+
+  const handleShare = async () => {
+    if (!task?.audio_url) return;
+    const fullUrl = `${window.location.origin}${task.audio_url}`;
+    if (navigator.share) {
+      await navigator.share({ title: displayName(task), text: task.transcription || "", url: fullUrl });
+    } else {
+      await navigator.clipboard.writeText(fullUrl);
+      alert("Link copied to clipboard!");
+    }
+  };
+
+  const total = task?.duration_seconds || duration;
+  const current = currentTime;
+
+  if (!task || !task.audio_url) {
+    return (
+      <section className="bg-white p-6 rounded-2xl border border-outline-variant shadow-sm overflow-hidden">
+        <p className="text-body-sm text-on-surface-variant text-center">No audio yet. Upload or generate a narration to play here.</p>
+      </section>
+    );
+  }
 
   return (
-    <section className="bg-white p-6 rounded-2xl border border-outline-variant shadow-sm overflow-hidden">
+    <section className="relative bg-white p-6 rounded-2xl border border-outline-variant shadow-sm overflow-hidden">
       <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-4">
-          <button className="w-14 h-14 rounded-full bg-primary text-on-primary flex items-center justify-center active:scale-95 transition-transform shadow-lg shadow-primary/20">
-            <span
-              className="material-symbols-outlined"
-              style={{ fontVariationSettings: "'FILL' 1", fontSize: 32 }}
-            >
-              play_arrow
+        <div className="flex items-center gap-4 min-w-0">
+          <button
+            data-editor-player-play-button="true"
+            onClick={handlePlayPause}
+            className="w-14 h-14 rounded-full bg-primary text-on-primary flex items-center justify-center active:scale-95 transition-transform shadow-lg shadow-primary/20 shrink-0"
+          >
+            <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1", fontSize: 32 }}>
+              {playing ? "pause" : "play_arrow"}
             </span>
           </button>
-          <div>
-            <p className="text-label-md text-on-surface">
-              Last Edited: Summary_Voiceover.mp3
-            </p>
+          <div className="min-w-0">
+            <p className="text-label-md text-on-surface truncate">{displayName(task)}</p>
             <p className="text-body-sm text-on-surface-variant">
-              01:45 / 03:20
+              {formatTime(current)} / {formatTime(total)}
             </p>
           </div>
         </div>
-        <div className="flex gap-2">
-          <button className="w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container transition-colors">
+        <div className="flex gap-2 shrink-0">
+          <button
+            onClick={handleRename}
+            className="w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container transition-colors"
+            title="Renomear"
+          >
             <span className="material-symbols-outlined">edit</span>
           </button>
-          <button className="w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container transition-colors">
+          <button
+            onClick={handleShare}
+            className="w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container transition-colors"
+            title="Compartilhar"
+          >
             <span className="material-symbols-outlined">share</span>
           </button>
         </div>
       </div>
-      <div
-        ref={containerRef}
-        className="flex items-end gap-1.5 h-16 w-full px-2"
-      />
+      <div ref={containerRef} className="flex items-end gap-1.5 h-16 w-full px-2" />
     </section>
   );
 }

@@ -15,7 +15,7 @@ async def test_synthesize_returns_bytes():
     with patch("app.services.tts_engine.edge_tts.Communicate", return_value=mock_communicate):
         from app.services.tts_engine import synthesize
 
-        result = await synthesize("Olá mundo", "pt-BR-FranciscaNeural")
+        result = await synthesize("Olá mundo", "en-US-AriaNeural")
 
         assert result == b"chunk1chunk2"
         mock_communicate.stream.assert_awaited_once()
@@ -29,7 +29,7 @@ async def test_synthesize_empty_text():
     with patch("app.services.tts_engine.edge_tts.Communicate", return_value=mock_communicate):
         from app.services.tts_engine import synthesize
 
-        result = await synthesize("", "pt-BR-FranciscaNeural")
+        result = await synthesize("", "en-US-AriaNeural")
 
         assert result == b""
 
@@ -37,7 +37,7 @@ async def test_synthesize_empty_text():
 @pytest.mark.asyncio
 async def test_list_voices_returns_formatted_list():
     raw_voices = [
-        {"ShortName": "pt-BR-FranciscaNeural", "Locale": "pt-BR", "Gender": "Female", "LocalName": "Francisca"},
+        {"ShortName": "en-US-AriaNeural", "Locale": "en-US", "Gender": "Female", "LocalName": "Aria"},
         {"ShortName": "pt-BR-AntonioNeural", "Locale": "pt-BR", "Gender": "Male", "LocalName": "Antônio"},
     ]
 
@@ -48,6 +48,6 @@ async def test_list_voices_returns_formatted_list():
         result = await list_voices()
 
         assert result == [
-            {"name": "pt-BR-FranciscaNeural", "locale": "pt-BR", "gender": "Female"},
+            {"name": "en-US-AriaNeural", "locale": "en-US", "gender": "Female"},
             {"name": "pt-BR-AntonioNeural", "locale": "pt-BR", "gender": "Male"},
         ]

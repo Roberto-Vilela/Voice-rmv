@@ -18,7 +18,7 @@ class Task(Base):
     type: Mapped[str] = mapped_column(String(50), nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="pending")
     progress: Mapped[int] = mapped_column(Integer, default=0)
-    voice: Mapped[str] = mapped_column(String(100), default="pt-BR-FranciscaNeural")
+    voice: Mapped[str] = mapped_column(String(100), default="en-US-AriaNeural")
     input_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     input_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     input_file: Mapped[str | None] = mapped_column(String(255), nullable=True)

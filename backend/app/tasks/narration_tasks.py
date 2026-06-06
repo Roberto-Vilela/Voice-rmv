@@ -27,7 +27,7 @@ def _save_transcription(task_id: str, text: str) -> str:
 
 
 @celery_app.task(bind=True)
-def narrate_video_url_task(self, url: str, voice: str, task_id: str):
+def narrate_video_url_task(self, url: str, voice: str, task_id: str, language: str | None = None):
     try:
         update_task(task_id, status="processing", progress=5)
 
@@ -45,7 +45,7 @@ def narrate_video_url_task(self, url: str, voice: str, task_id: str):
 
         update_task(task_id, progress=50)
 
-        transcription = transcribe(audio_path)
+        transcription = transcribe(audio_path, language=language)
         text = transcription["text"]
         _save_transcription(task_id, text)
 
@@ -60,6 +60,8 @@ def narrate_video_url_task(self, url: str, voice: str, task_id: str):
             progress=100,
             audio_path=narration_path,
             duration_seconds=transcription["duration"],
+            transcription=text,
+            extra_data={"transcription_segments": transcription["segments"], "language": transcription["language"]},
         )
 
     except Exception as e:
@@ -67,7 +69,7 @@ def narrate_video_url_task(self, url: str, voice: str, task_id: str):
 
 
 @celery_app.task(bind=True)
-def narrate_audio_file_task(self, file_path: str, voice: str, task_id: str):
+def narrate_audio_file_task(self, file_path: str, voice: str, task_id: str, language: str | None = None):
     try:
         update_task(task_id, status="processing", progress=10)
 
@@ -75,7 +77,7 @@ def narrate_audio_file_task(self, file_path: str, voice: str, task_id: str):
 
         update_task(task_id, progress=40)
 
-        transcription = transcribe(wav_path)
+        transcription = transcribe(wav_path, language=language)
         text = transcription["text"]
         _save_transcription(task_id, text)
 
@@ -90,6 +92,8 @@ def narrate_audio_file_task(self, file_path: str, voice: str, task_id: str):
             progress=100,
             audio_path=narration_path,
             duration_seconds=transcription["duration"],
+            transcription=text,
+            extra_data={"transcription_segments": transcription["segments"], "language": transcription["language"]},
         )
 
     except Exception as e:
@@ -99,7 +103,7 @@ def narrate_audio_file_task(self, file_path: str, voice: str, task_id: str):
 
 
 @celery_app.task(bind=True)
-def narrate_video_file_task(self, file_path: str, voice: str, task_id: str):
+def narrate_video_file_task(self, file_path: str, voice: str, task_id: str, language: str | None = None):
     try:
         update_task(task_id, status="processing", progress=10)
 
@@ -107,7 +111,7 @@ def narrate_video_file_task(self, file_path: str, voice: str, task_id: str):
 
         update_task(task_id, progress=40)
 
-        transcription = transcribe(audio_path)
+        transcription = transcribe(audio_path, language=language)
         text = transcription["text"]
         _save_transcription(task_id, text)
 
@@ -122,6 +126,8 @@ def narrate_video_file_task(self, file_path: str, voice: str, task_id: str):
             progress=100,
             audio_path=narration_path,
             duration_seconds=transcription["duration"],
+            transcription=text,
+            extra_data={"transcription_segments": transcription["segments"], "language": transcription["language"]},
         )
 
     except Exception as e:
