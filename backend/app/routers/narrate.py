@@ -81,8 +81,8 @@ async def narrate_upload(file: UploadFile, voice: str = Form("en-US-AriaNeural")
     await db.refresh(task)
 
     if is_video:
-        narrate_video_file_task.delay(str(file_path), voice, str(task.id))
+        narrate_video_file_task.delay(str(file_path), voice, str(task.id), None, file.filename)
     else:
-        narrate_audio_file_task.delay(str(file_path), voice, str(task.id))
+        narrate_audio_file_task.delay(str(file_path), voice, str(task.id), None, file.filename)
 
     return task_to_response(task)

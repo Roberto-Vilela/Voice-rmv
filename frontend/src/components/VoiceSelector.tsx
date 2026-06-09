@@ -77,7 +77,7 @@ export default function VoiceSelector({ value, onChange, variant = "default" }: 
   };
 
   return (
-    <div className={`relative bg-primary-container text-on-primary-container p-gutter rounded-2xl shadow-sm ${variant === "default" ? "pt-8" : ""}`}>
+    <div className={`relative bg-primary-container text-on-primary-container rounded-2xl shadow-sm ${variant === "default" ? "p-gutter pt-8" : "p-2 h-14 flex items-center"}`}>
       {variant === "default" && (
         <>
           <div className="absolute -top-4 left-6 w-9 h-9 rounded-full border-2 border-white bg-orange-500 text-white flex items-center justify-center text-label-md shadow-md">
@@ -92,7 +92,7 @@ export default function VoiceSelector({ value, onChange, variant = "default" }: 
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setOpen(!open)}
-            className="w-full bg-on-primary-container text-primary-container rounded-xl px-3 py-2.5 text-label-md flex items-center justify-between cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-fixed-dim"
+            className="w-full h-10 bg-on-primary-container text-primary-container rounded-xl px-3 py-2.5 text-label-md flex items-center justify-between cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-fixed-dim"
           >
             <span className="truncate mr-2">{currentLabel}</span>
             <span className="material-symbols-outlined text-[18px] shrink-0">
@@ -100,7 +100,7 @@ export default function VoiceSelector({ value, onChange, variant = "default" }: 
             </span>
           </button>
           {open && (
-            <div className="absolute left-0 right-0 top-full mt-1 max-h-72 overflow-y-auto bg-white rounded-xl shadow-lg border border-outline-variant z-50">
+            <div className="absolute left-0 right-0 top-full mt-1 max-h-72 overflow-y-auto bg-white rounded-xl shadow-lg border border-outline-variant z-[120]">
               <div className="py-1">
                 <div className="px-3 py-1.5 text-label-sm text-outline font-semibold">🇧🇷 Português (Brasil)</div>
                 {ptVoices.map((v) => (

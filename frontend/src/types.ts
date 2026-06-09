@@ -2,6 +2,9 @@ export type TaskStatus = "pending" | "processing" | "completed" | "error";
 
 export interface TaskExtraData {
   display_name?: string;
+  video_title?: string;
+  source_url?: string;
+  language?: string;
   transcription_segments?: Array<{
     start?: number;
     end?: number;

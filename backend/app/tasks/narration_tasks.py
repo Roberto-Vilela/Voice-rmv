@@ -1,14 +1,26 @@
 from pathlib import Path
 
 from app.config import settings
-from app.database import update_task
+from app.database import update_task, get_db
 from app.services.audio_processor import convert_to_wav, extract_audio
 from app.services.transcriber import transcribe
 from app.services.tts_engine import synthesize
 from app.services.video_downloader import download_video
 from app.tasks.celery_app import celery_app
 from app.database import run_async
+from app.models.task import Task
+from sqlalchemy.orm import Session
+from app.database import sync_engine
 
+def _get_task_by_id(task_id: str) -> dict:
+    with Session(sync_engine) as session:
+        task = session.query(Task).filter(Task.id == task_id).first()
+        return task.extra_data or {}
+
+def _update_task_extra(task_id: str, new_data: dict):
+    current = _get_task_by_id(task_id)
+    current.update(new_data)
+    update_task(task_id, extra_data=current)
 
 def _save_narration_audio(task_id: str, audio_bytes: bytes) -> str:
     audio_dir = Path(settings.output_dir) / "narrations"
@@ -39,6 +51,15 @@ def narrate_video_url_task(self, url: str, voice: str, task_id: str, language: s
         result = download_video(url, str(video_dir))
         video_path = result["file_path"]
 
+        _update_task_extra(
+            task_id,
+            {
+                "video_title": result["title"],
+                "source_url": url,
+                "language": language or "auto",
+            },
+        )
+
         update_task(task_id, progress=30)
 
         audio_path = extract_audio(video_path, str(temp_dir / "audio.wav"))
@@ -54,6 +75,16 @@ def narrate_video_url_task(self, url: str, voice: str, task_id: str, language: s
         audio_bytes = run_async(synthesize(text, voice))
         narration_path = _save_narration_audio(task_id, audio_bytes)
 
+        _update_task_extra(
+            task_id,
+            {
+                "video_title": result["title"],
+                "source_url": url,
+                "display_name": result["title"],
+                "transcription_segments": transcription["segments"],
+                "language": transcription["language"],
+            },
+        )
         update_task(
             task_id,
             status="completed",
@@ -61,7 +92,6 @@ def narrate_video_url_task(self, url: str, voice: str, task_id: str, language: s
             audio_path=narration_path,
             duration_seconds=transcription["duration"],
             transcription=text,
-            extra_data={"transcription_segments": transcription["segments"], "language": transcription["language"]},
         )
 
     except Exception as e:
@@ -69,9 +99,13 @@ def narrate_video_url_task(self, url: str, voice: str, task_id: str, language: s
 
 
 @celery_app.task(bind=True)
-def narrate_audio_file_task(self, file_path: str, voice: str, task_id: str, language: str | None = None):
+def narrate_audio_file_task(self, file_path: str, voice: str, task_id: str, language: str | None = None, input_file: str | None = None):
     try:
         update_task(task_id, status="processing", progress=10)
+
+        early_display = Path(input_file).stem if input_file else None
+        if early_display:
+            _update_task_extra(task_id, {"display_name": early_display})
 
         wav_path = convert_to_wav(file_path)
 
@@ -86,6 +120,12 @@ def narrate_audio_file_task(self, file_path: str, voice: str, task_id: str, lang
         audio_bytes = run_async(synthesize(text, voice))
         narration_path = _save_narration_audio(task_id, audio_bytes)
 
+        extra_data = {"transcription_segments": transcription["segments"], "language": transcription["language"]}
+        if early_display:
+            extra_data["display_name"] = early_display
+
+        _update_task_extra(task_id, extra_data)
+
         update_task(
             task_id,
             status="completed",
@@ -93,7 +133,6 @@ def narrate_audio_file_task(self, file_path: str, voice: str, task_id: str, lang
             audio_path=narration_path,
             duration_seconds=transcription["duration"],
             transcription=text,
-            extra_data={"transcription_segments": transcription["segments"], "language": transcription["language"]},
         )
 
     except Exception as e:
@@ -103,9 +142,13 @@ def narrate_audio_file_task(self, file_path: str, voice: str, task_id: str, lang
 
 
 @celery_app.task(bind=True)
-def narrate_video_file_task(self, file_path: str, voice: str, task_id: str, language: str | None = None):
+def narrate_video_file_task(self, file_path: str, voice: str, task_id: str, language: str | None = None, input_file: str | None = None):
     try:
         update_task(task_id, status="processing", progress=10)
+
+        early_display = Path(input_file).stem if input_file else None
+        if early_display:
+            _update_task_extra(task_id, {"display_name": early_display})
 
         audio_path = extract_audio(file_path, f"{settings.temp_dir}/{Path(file_path).stem}.wav")
 
@@ -120,6 +163,12 @@ def narrate_video_file_task(self, file_path: str, voice: str, task_id: str, lang
         audio_bytes = run_async(synthesize(text, voice))
         narration_path = _save_narration_audio(task_id, audio_bytes)
 
+        extra_data = {"transcription_segments": transcription["segments"], "language": transcription["language"]}
+        if early_display:
+            extra_data["display_name"] = early_display
+
+        _update_task_extra(task_id, extra_data)
+
         update_task(
             task_id,
             status="completed",
@@ -127,7 +176,6 @@ def narrate_video_file_task(self, file_path: str, voice: str, task_id: str, lang
             audio_path=narration_path,
             duration_seconds=transcription["duration"],
             transcription=text,
-            extra_data={"transcription_segments": transcription["segments"], "language": transcription["language"]},
         )
 
     except Exception as e:

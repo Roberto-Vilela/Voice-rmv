@@ -1,5 +1,6 @@
 import { useTasks } from "../api/hooks";
 import { useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import TaskRow from "./TaskRow";
 import type { Task } from "../types";
 
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export default function RecentActivity({ onSelectTask }: Props) {
+  const navigate = useNavigate();
   const { data: tasks = [], isLoading, refetch } = useTasks();
 
   const recentTasks = useMemo(() => {
@@ -30,7 +32,7 @@ export default function RecentActivity({ onSelectTask }: Props) {
     <div className="bg-white rounded-2xl border border-outline-variant shadow-sm overflow-hidden flex-grow">
       <div className="px-6 py-5 border-b border-outline-variant flex justify-between items-center">
         <h2 className="text-headline-md text-on-surface">Recent Activity</h2>
-        <button className="text-primary text-label-md hover:underline px-3 py-1 rounded-lg hover:bg-primary/5">
+        <button onClick={() => navigate("/library")} className="text-primary text-label-md hover:underline px-3 py-1 rounded-lg hover:bg-primary/5">
           View All
         </button>
       </div>

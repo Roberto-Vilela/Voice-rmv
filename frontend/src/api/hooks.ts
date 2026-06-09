@@ -20,6 +20,12 @@ export function useTasks() {
     queryFn: listTasks,
     staleTime: 1000 * 60,
     refetchOnWindowFocus: false,
+    refetchInterval: (query) => {
+      const tasks = query.state.data;
+      if (!tasks) return 3000;
+      const hasActive = tasks.some(t => t.status === "pending" || t.status === "processing");
+      return hasActive ? 3000 : false;
+    },
   });
 }
 

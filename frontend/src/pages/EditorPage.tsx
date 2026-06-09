@@ -163,14 +163,31 @@ export default function EditorPage() {
   const isLoadingTask = !!taskId && !currentTaskData;
 
   const sourceKey = taskId ? currentTask?.id || `loading:${taskId}` : currentTask?.id || `draft:${draftText || "empty"}`;
+  const taskContentKey = JSON.stringify({
+    status: currentTask?.status || null,
+    updatedAt: currentTask?.updated_at || null,
+    transcription: currentTask?.transcription || "",
+    inputText: currentTask?.input_text || "",
+    duration: currentTask?.duration_seconds || 0,
+    backendSegments: currentTask?.extra_data?.transcription_segments || [],
+    editorSegments: currentTask?.extra_data?.editor_segments || [],
+  });
 
   useEffect(() => {
-    setSegments(buildSegments(currentTask, draftText));
     setIsDirty(false);
     setSavedAt(null);
     setError(null);
     setCurrentTime(0);
   }, [sourceKey]);
+
+  useEffect(() => {
+    console.log("DEBUG: currentTask updated:", currentTask);
+    console.log("DEBUG: transcription_segments:", currentTask?.extra_data?.transcription_segments);
+    if (isDirty) return;
+    const newSegments = buildSegments(currentTask, draftText);
+    console.log("DEBUG: segments generated:", newSegments);
+    setSegments(newSegments);
+  }, [currentTask, draftText, isDirty, taskContentKey]);
 
   useEffect(() => {
     const root = revealScopeRef.current;
@@ -202,11 +219,27 @@ export default function EditorPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [segments, isDirty, currentTask?.id]);
 
-  const activeSegmentIndex = useMemo(() => {
-    if (!segments.length) return -1;
-    const index = segments.findIndex((segment) => currentTime >= segment.start && currentTime <= segment.end);
-    return index >= 0 ? index : 0;
-  }, [segments, currentTime]);
+  const [activeSegmentIndex, setActiveSegmentIndex] = useState(-1);
+
+  // Use um efeito simples para atualizar o estado apenas quando o índice mudar
+  useEffect(() => {
+    // 2.0s de atraso ajustado pelo usuário
+    const SYNC_OFFSET = 2.0; 
+    
+    // Ajustamos o tempo atual do áudio para comparar com os timestamps do segmento
+    // Se o áudio está "atrasado" em relação à transcrição, 
+    // precisamos subtrair o offset do tempo que comparamos.
+    const adjustedTime = Math.max(0, currentTime - SYNC_OFFSET);
+
+    // Só marca se o tempo ajustado for maior que um pequeno threshold (0.1s)
+    const index = adjustedTime > 0.1 ? segments.findIndex((segment) => 
+      adjustedTime >= segment.start && adjustedTime < segment.end
+    ) : -1;
+    
+    if (index !== activeSegmentIndex) {
+      setActiveSegmentIndex(index);
+    }
+  }, [currentTime, segments, activeSegmentIndex]);
 
   const updateSegmentHtml = (id: string, html: string) => {
     setSegments((current) => current.map((segment) => (segment.id === id ? { ...segment, html } : segment)));
@@ -420,7 +453,7 @@ export default function EditorPage() {
                 segments.map((segment, index) => {
                   const isActive = index === activeSegmentIndex;
                   return (
-                    <div key={segment.id} data-reveal className={`reveal-card hover-lift flex gap-4 p-4 rounded-lg group transition-all ${isActive ? "active-row" : "zebra-row"}`}>
+                    <div key={segment.id} className={`reveal-card hover-lift flex gap-4 p-4 rounded-lg group transition-all is-visible ${isActive ? 'active-row font-semibold bg-primary/5' : 'zebra-row'}`}>
                       <div className={`min-w-[110px] font-code-md text-code-md mt-1 ${isActive ? "text-primary font-bold" : "text-primary opacity-60"}`}>
                         {formatRange(segment.start, segment.end)}
                       </div>
@@ -429,13 +462,12 @@ export default function EditorPage() {
                           <span className={`font-label-md px-2 py-0.5 rounded text-xs ${isActive ? "text-on-primary bg-primary" : "text-primary bg-primary-fixed"}`}>
                             SPEAKER {segment.speaker}
                           </span>
-                          {isActive && <span className="text-xs text-on-surface-variant italic">Highlighted during playback</span>}
                         </div>
                         <div
                           contentEditable
                           suppressContentEditableWarning
                           spellCheck={false}
-                          className={`outline-none focus:ring-2 focus:ring-primary/10 rounded p-1 text-body-md text-on-surface leading-relaxed ${isActive ? "font-semibold bg-primary/5" : ""}`}
+                          className={`outline-none focus:ring-2 focus:ring-primary/10 rounded p-1 text-body-md text-on-surface leading-relaxed`}
                           dangerouslySetInnerHTML={{ __html: segment.html }}
                           onFocus={() => setCurrentTime(segment.start)}
                           onInput={(e) => updateSegmentHtml(segment.id, e.currentTarget.innerHTML)}

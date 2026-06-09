@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import type { Task } from "../types";
 import { deleteTask, duplicateTask } from "../api/client";
 import AudioModal from "./AudioModal";
@@ -9,7 +10,32 @@ interface Props {
   onSelectTask?: (task: Task) => void;
 }
 
+function getTaskTitle(task: Task): string {
+  return task.extra_data?.video_title
+    || task.extra_data?.display_name
+    || task.input_file
+    || task.input_text
+    || (task.type === "video_url" ? "Processing YouTube video" : "Untitled");
+}
+
+function getTaskLink(task: Task): string {
+  if (task.type === "audio_upload" || task.type === "video_upload") {
+    return task.input_file || "";
+  }
+  const link = task.extra_data?.source_url
+    || task.input_url
+    || task.audio_url
+    || "";
+
+  return link;
+}
+
+function getTaskLanguage(task: Task): string {
+  return String(task.extra_data?.language || "Auto");
+}
+
 export default React.memo(function TaskRow({ task, onRefetch, onSelectTask }: Props) {
+  const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -28,18 +54,20 @@ export default React.memo(function TaskRow({ task, onRefetch, onSelectTask }: Pr
     completed: "bg-green-100 text-green-700",
     processing: "bg-primary-fixed text-primary",
     error: "bg-red-100 text-red-700",
+    pending: "bg-gray-100 text-gray-500",
   };
   const dotColors: Record<string, string> = {
     completed: "bg-green-600",
     processing: "bg-primary",
     error: "bg-red-600",
+    pending: "bg-gray-400",
   };
   const statusClass = statusColors[task.status] ?? "bg-gray-100 text-gray-700";
   const dotClass = dotColors[task.status] ?? "bg-gray-600";
 
   const iconName =
     task.type === "audio_upload" ? "mic"
-    : task.type === "video_upload" ? "movie"
+    : task.type === "video_upload" || task.type === "video_url" ? "volume_up"
     : "description";
 
   const handleDuplicate = async () => {
@@ -60,12 +88,12 @@ export default React.memo(function TaskRow({ task, onRefetch, onSelectTask }: Pr
   };
 
   const handleEditText = () => {
-    window.location.href = `/editor?taskId=${task.id}`;
+    navigate(`/editor?taskId=${task.id}`);
     setMenuOpen(false);
   };
 
   const handleRerecord = () => {
-    window.location.href = `/voice-over?taskId=${task.id}`;
+    navigate(`/voice-over?taskId=${task.id}`);
     setMenuOpen(false);
   };
 
@@ -76,10 +104,28 @@ export default React.memo(function TaskRow({ task, onRefetch, onSelectTask }: Pr
       </div>
 
       <div className="flex-grow min-w-0">
-        <h4 className="text-label-md text-on-surface truncate">
-          {task.input_file || task.input_text || task.input_url}
+        <h4 className="text-label-md text-on-surface truncate" title={getTaskTitle(task)}>
+          {getTaskTitle(task)}
         </h4>
-        <p className="text-body-sm text-on-surface-variant">{task.voice}</p>
+        {getTaskLink(task) ? (
+          <p className="text-body-sm text-on-surface-variant truncate" title={getTaskLink(task)}>
+            {getTaskLink(task)}
+          </p>
+        ) : (
+          <p className="text-body-sm text-on-surface-variant truncate">
+            {task.type === "video_url" ? "Waiting for video link" : "Link not available"}
+          </p>
+        )}
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-on-surface-variant">
+          <span className="inline-flex items-center gap-1">
+            <span className="material-symbols-outlined text-[14px]">translate</span>
+            {getTaskLanguage(task)}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="material-symbols-outlined text-[14px]">graphic_eq</span>
+            {task.voice}
+          </span>
+        </div>
       </div>
 
       <div className="flex items-center gap-6">
@@ -105,7 +151,7 @@ export default React.memo(function TaskRow({ task, onRefetch, onSelectTask }: Pr
             more_vert
           </button>
           {menuOpen && (
-            <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-lg border border-outline-variant z-50 py-1 overflow-hidden">
+            <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-lg border border-outline-variant z-50 py-1 max-h-[60vh] overflow-y-auto">
               {task.audio_url && (
                 <button onClick={handlePlayAudio} className="w-full flex items-center gap-3 px-4 py-2.5 text-label-md text-on-surface hover:bg-surface-container text-left">
                   <span className="material-symbols-outlined text-on-surface-variant text-[18px]">play_arrow</span>

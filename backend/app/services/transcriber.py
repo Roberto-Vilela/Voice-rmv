@@ -12,7 +12,8 @@ def get_model() -> WhisperModel:
 
 def transcribe(audio_path: str, language: str | None = None) -> dict:
     model = get_model()
-    segments, info = model.transcribe(audio_path, language=language, task="transcribe")
+    segments_gen, info = model.transcribe(audio_path, language=language, task="transcribe")
+    segments = list(segments_gen)
     return {
         "text": " ".join(seg.text for seg in segments),
         "segments": [

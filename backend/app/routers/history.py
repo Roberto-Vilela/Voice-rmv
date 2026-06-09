@@ -9,6 +9,7 @@ from app.database import get_db
 from app.models.schemas import TaskListResponse, TaskResponse
 from app.models.task import Task
 from app.services.task_response import task_to_response
+from app.tasks.narration_tasks import narrate_video_url_task
 
 
 class TaskPatchRequest(BaseModel):
@@ -55,6 +56,7 @@ async def duplicate_task(task_id: UUID, db: AsyncSession = Depends(get_db)):
     original = result.scalar_one_or_none()
     if original is None:
         raise HTTPException(status_code=404, detail="Task not found")
+
     new_task = Task(
         type=original.type,
         voice=original.voice,
@@ -65,6 +67,16 @@ async def duplicate_task(task_id: UUID, db: AsyncSession = Depends(get_db)):
     db.add(new_task)
     await db.commit()
     await db.refresh(new_task)
+
+    # Re-dispatch celery for video_url tasks; upload tasks can't be re-processed (file deleted)
+    if original.type == "video_url" and original.input_url:
+        narrate_video_url_task.delay(original.input_url, original.voice, str(new_task.id))
+    elif original.type in ("audio_upload", "video_upload"):
+        new_task.status = "error"
+        new_task.error = "Duplicate not supported for upload tasks. Original file no longer available."
+        await db.commit()
+        await db.refresh(new_task)
+
     return task_to_response(new_task)
 
 

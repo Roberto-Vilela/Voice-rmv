@@ -20,7 +20,7 @@ export default function HeroSection({
 
   // APPROACH 3: Híbrido - Progresso real do backend + suavização visual
   const pollTask = async (taskId: string) => {
-    return new Promise<void>((resolve) => {
+    return new Promise<Task>((resolve, reject) => {
       const pollingInterval = setInterval(async () => {
         try {
           const updatedTask = await getTask(taskId);
@@ -31,13 +31,13 @@ export default function HeroSection({
           // Check completion
           if (updatedTask.status === "completed") {
             clearInterval(pollingInterval);
-            resolve();
+            resolve(updatedTask);
             if (onVideoSubmitted) {
               onVideoSubmitted(updatedTask);
             }
           } else if (updatedTask.status === "error") {
             clearInterval(pollingInterval);
-            setError(humanizeError(updatedTask.error || "Processing failed"));
+            reject(new Error(updatedTask.error || "Processing failed"));
           }
         } catch (err) {
           // Ignore polling errors
@@ -82,7 +82,7 @@ export default function HeroSection({
   };
 
   const getFriendlyMessage = (progress: number): string => {
-    const messages = {
+    const messages: Record<number, string> = {
       0: "Initializing...",
       5: "Downloading video from YouTube...",
       30: "✓ Video downloaded! Extracting audio...",
@@ -116,47 +116,62 @@ export default function HeroSection({
   // Humanize error messages from backend
   const humanizeError = (error: string): string => {
     try {
+      const normalized = error.toLowerCase();
+
       // YouTube specific errors
-      if (error.includes("video unavailable") || error.includes("Video Unavailable")) {
-        return "This video is not available. Please check if the URL is correct.";
+      if (
+        normalized.includes("this video is not available")
+        || normalized.includes("video unavailable")
+      ) {
+        return "This YouTube video is not available for processing. Try another public video link.";
       }
-      if (error.includes("not found") || error.includes("NotFound")) {
-        return "This video could not be found. Please check the URL.";
+      if (normalized.includes("task not found")) {
+        return "We lost track of this processing job. Please submit the video again.";
       }
-      if (error.includes("private") || error.includes("Private")) {
-        return "This video is private. You don't have access to it.";
+      if (normalized.includes("not found")) {
+        return "We could not find this video. Check the link and try again.";
       }
-      if (error.includes("age restricted") || error.includes("Age restricted")) {
+      if (normalized.includes("private")) {
+        return "This video is private and cannot be processed from here.";
+      }
+      if (normalized.includes("age restricted")) {
         return "This video is age-restricted and cannot be processed.";
       }
-      if (error.includes("short") || error.includes("Short")) {
-        return "YouTube Shorts are not supported. Please use a regular video URL.";
+      if (normalized.includes("short")) {
+        return "YouTube Shorts are not supported yet. Please use a regular public video URL.";
       }
-      if (error.includes("login required") || error.includes("Login required")) {
-        return "Please log in to your YouTube account first.";
+      if (normalized.includes("login required") || normalized.includes("sign in")) {
+        return "This video requires a signed-in YouTube session and cannot be processed right now.";
       }
-      if (error.includes("download failed") || error.includes("Download failed")) {
-        return "Failed to download the video. Please try again later.";
+      if (normalized.includes("download failed")) {
+        return "We could not download this video. Please try again in a moment or use another link.";
       }
-      if (error.includes("transcription failed") || error.includes("Transcription failed")) {
-        return "Failed to transcribe the video. Please try with a different video.";
+      if (normalized.includes("transcription failed")) {
+        return "We could not transcribe this video. Try another video with clearer audio.";
+      }
+      if (
+        normalized.includes("network")
+        || normalized.includes("timeout")
+        || normalized.includes("temporarily unavailable")
+      ) {
+        return "There was a temporary connection problem while contacting YouTube. Please try again.";
       }
 
       // Generic error handling - fallback to standard message
-      if (error.startsWith("Error") || !error.includes("[youtube]") && !error.includes("yt-dlp")) {
-        return "Unfortunately, we cannot fulfill your request at the moment. Please refresh the page and try again.";
+      if (error.startsWith("Error") || !normalized.includes("[youtube]") && !normalized.includes("yt-dlp")) {
+        return "We could not process this video right now. Please try again or use a different public YouTube link.";
       }
 
       // Fallback: show first meaningful line
       const lines = error.split('\n').filter(line => line.trim());
-      return lines[0] || "Unfortunately, we cannot fulfill your request at the moment. Please refresh the page and try again.";
+      return lines[0] || "We could not process this video right now. Please try again or use a different public YouTube link.";
     } catch {
-      return "Unfortunately, we cannot fulfill your request at the moment. Please refresh the page and try again.";
+      return "We could not process this video right now. Please try again or use a different public YouTube link.";
     }
   };
 
   return (
-    <section className="relative bg-[#4f46e5] rounded-3xl p-10 text-white overflow-hidden mb-8">
+    <section className="relative bg-[#4f46e5] rounded-3xl p-10 text-white overflow-visible mb-8">
       <div className="max-w-2xl relative z-10">
         <h2 className="text-5xl font-bold leading-tight mb-4 tracking-tight">
           Transform any video into clear text and audio.
@@ -280,13 +295,13 @@ export default function HeroSection({
           </div>
         )}
 
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="flex-1 min-w-0 relative group">
+        <div className="flex flex-col lg:flex-row lg:items-stretch gap-3">
+          <div className="flex-1 lg:min-w-[400px] relative group">
             <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-primary opacity-60 group-focus-within:opacity-100 transition-opacity">
               link
             </span>
             <input
-              className="w-full pl-12 pr-4 py-4 rounded-2xl border-none text-on-surface focus:ring-4 focus:ring-primary-fixed-dim transition-all text-body-md bg-white"
+              className="w-full h-14 pl-12 pr-4 rounded-2xl border-none text-on-surface focus:ring-4 focus:ring-primary-fixed-dim transition-all text-body-md bg-white"
               placeholder="Paste YouTube URL here..."
               type="text"
               value={url}
@@ -300,14 +315,14 @@ export default function HeroSection({
             />
           </div>
 
-          <div className="w-full sm:w-48 shrink-0">
+          <div className="w-full lg:w-56 shrink-0">
             <VoiceSelector value={selectedVoiceId} onChange={setSelectedVoiceId} variant="compact" />
           </div>
 
           <button
             onClick={submitVideo}
             disabled={isSubmitting || !url.trim()}
-            className={`shrink-0 bg-secondary-container text-on-secondary-container px-6 py-4 rounded-2xl text-label-md hover:scale-[1.02] hover:brightness-110 transition-all active:scale-95 flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:brightness-100 ${
+            className={`h-14 shrink-0 bg-secondary-container text-on-secondary-container px-6 rounded-2xl text-label-md hover:scale-[1.02] hover:brightness-110 transition-all active:scale-95 flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:brightness-100 lg:min-w-[240px] ${
               isSubmitting ? "animate-pulse" : ""
             }`}
           >

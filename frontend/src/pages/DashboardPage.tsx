@@ -30,9 +30,6 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-stack-lg">
-      <h1 className="text-2xl font-bold text-slate-900 mb-6">
-        Welcome back, Alex!
-      </h1>
       <HeroSection selectedVoice={voice} onVideoSubmitted={handleVideoSubmitted} />
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-gutter">

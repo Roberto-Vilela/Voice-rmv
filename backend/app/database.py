@@ -1,7 +1,7 @@
 import asyncio
 from sqlalchemy import create_engine, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.orm import DeclarativeBase, Session
+from sqlalchemy.orm import DeclarativeBase, Session, attributes
 
 from app.config import settings
 
@@ -49,6 +49,8 @@ def update_task(task_id: str, **kwargs):
                 return
             for key, value in kwargs.items():
                 setattr(task, key, value)
+            if "extra_data" in kwargs:
+                attributes.flag_modified(task, "extra_data")
             session.commit()
         return
 
@@ -60,6 +62,8 @@ def update_task(task_id: str, **kwargs):
                 return
             for key, value in kwargs.items():
                 setattr(task, key, value)
+            if "extra_data" in kwargs:
+                attributes.flag_modified(task, "extra_data")
             await session.commit()
 
     run_async(_update())

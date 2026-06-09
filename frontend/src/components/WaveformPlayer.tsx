@@ -19,6 +19,7 @@ function displayName(task: Task): string {
 }
 
 export default function WaveformPlayer({ task, onTimeUpdate }: Props) {
+  const wrapperRef = useRef<HTMLElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -42,58 +43,98 @@ export default function WaveformPlayer({ task, onTimeUpdate }: Props) {
   }, [task?.id]);
 
   useEffect(() => {
+    if (wrapperRef.current) {
+      wrapperRef.current.dataset.playing = playing ? "true" : "false";
+    }
     let interval: ReturnType<typeof setInterval> | null = null;
     if (playing) {
       interval = setInterval(() => {
         barsRef.current.forEach((bar) => {
-          bar.style.height = `${Math.random() * 80 + 20}%`;
+          bar.style.height = `${Math.random() * 72 + 28}%`;
         });
-      }, 300);
+      }, 140);
     }
     return () => { if (interval) clearInterval(interval); };
   }, [playing]);
 
   useEffect(() => {
-    const audio = task?.audio_url ? new Audio(task.audio_url) : null;
+    if (!task?.audio_url) return;
+
+    // Inicializa o objeto de áudio apenas uma vez por mudança de task
+    const audio = new Audio(task.audio_url);
     audioRef.current = audio;
+
     setPlaying(false);
     setCurrentTime(0);
     setDuration(0);
-    if (!audio) return;
-    const onTime = () => {
-      setCurrentTime(audio.currentTime);
-      onTimeUpdate?.(audio.currentTime);
+
+    let rafId: number;
+    const updateTime = () => {
+      if (audioRef.current) {
+        const time = audioRef.current.currentTime;
+        setCurrentTime(time);
+        onTimeUpdate?.(time);
+        if (playing) {
+          rafId = requestAnimationFrame(updateTime);
+        }
+      }
     };
+
+    const onPlay = () => setPlaying(true);
+    const onPause = () => setPlaying(false);
     const onMeta = () => setDuration(audio.duration || 0);
     const onEnd = () => {
       setPlaying(false);
       setCurrentTime(0);
       onTimeUpdate?.(0);
+      cancelAnimationFrame(rafId);
     };
-    audio.addEventListener("timeupdate", onTime);
+
+    audio.addEventListener("play", onPlay);
+    audio.addEventListener("pause", onPause);
     audio.addEventListener("loadedmetadata", onMeta);
     audio.addEventListener("ended", onEnd);
+    
     return () => {
       audio.pause();
-      onTimeUpdate?.(0);
-      audio.removeEventListener("timeupdate", onTime);
+      cancelAnimationFrame(rafId);
+      audio.removeEventListener("play", onPlay);
+      audio.removeEventListener("pause", onPause);
       audio.removeEventListener("loadedmetadata", onMeta);
       audio.removeEventListener("ended", onEnd);
+      audioRef.current = null;
     };
   }, [task?.audio_url]);
 
-  const handlePlayPause = () => {
-    if (!task?.audio_url) return;
-    if (!audioRef.current) {
-      audioRef.current = new Audio(task.audio_url);
-    }
+  // Efeito separado para controlar o loop de animação conforme o estado playing
+  useEffect(() => {
+    let rafId: number;
+    const updateTime = () => {
+      if (audioRef.current) {
+        setCurrentTime(audioRef.current.currentTime);
+        onTimeUpdate?.(audioRef.current.currentTime);
+        if (playing) {
+          rafId = requestAnimationFrame(updateTime);
+        }
+      }
+    };
+
     if (playing) {
-      audioRef.current.pause();
-      setPlaying(false);
-      onTimeUpdate?.(currentTime);
+      rafId = requestAnimationFrame(updateTime);
+    }
+    return () => cancelAnimationFrame(rafId);
+  }, [playing]);
+
+  const handlePlayPause = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    
+    if (playing) {
+      audio.pause();
     } else {
-      audioRef.current.currentTime = 0;
-      audioRef.current.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+      audio.play().catch((e) => {
+        console.error("Playback failed:", e);
+      });
     }
   };
 
@@ -123,20 +164,24 @@ export default function WaveformPlayer({ task, onTimeUpdate }: Props) {
 
   if (!task || !task.audio_url) {
     return (
-      <section className="bg-white p-6 rounded-2xl border border-outline-variant shadow-sm overflow-hidden">
+      <section className="waveform-player bg-white p-6 rounded-2xl border border-outline-variant shadow-sm overflow-hidden" ref={wrapperRef}>
         <p className="text-body-sm text-on-surface-variant text-center">No audio yet. Upload or generate a narration to play here.</p>
       </section>
     );
   }
 
   return (
-    <section className="relative bg-white p-6 rounded-2xl border border-outline-variant shadow-sm overflow-hidden">
+    <section
+      ref={wrapperRef}
+      className="waveform-player relative bg-white p-6 rounded-2xl border border-outline-variant shadow-sm overflow-hidden"
+      data-playing={playing ? "true" : "false"}
+    >
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4 min-w-0">
           <button
             data-editor-player-play-button="true"
             onClick={handlePlayPause}
-            className="w-14 h-14 rounded-full bg-primary text-on-primary flex items-center justify-center active:scale-95 transition-transform shadow-lg shadow-primary/20 shrink-0"
+            className={`waveform-play-button w-14 h-14 rounded-full bg-primary text-on-primary flex items-center justify-center active:scale-95 transition-transform shadow-lg shadow-primary/20 shrink-0 ${playing ? "is-playing" : ""}`}
           >
             <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1", fontSize: 32 }}>
               {playing ? "pause" : "play_arrow"}
