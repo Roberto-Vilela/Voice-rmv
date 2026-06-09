@@ -58,3 +58,25 @@ def test_convert_to_wav_default_output():
 
         assert result == "/tmp/audio.wav"
         mock_run.assert_called_once()
+
+
+def test_get_media_duration_uses_ffprobe():
+    with patch("app.services.audio_processor.subprocess.run") as mock_run:
+        mock_run.return_value.stdout = "12.345\n"
+        from app.services.audio_processor import get_media_duration
+
+        result = get_media_duration("/tmp/narration.mp3")
+
+        assert result == 12.345
+        mock_run.assert_called_once_with(
+            [
+                "ffprobe",
+                "-v", "error",
+                "-show_entries", "format=duration",
+                "-of", "default=noprint_wrappers=1:nokey=1",
+                "/tmp/narration.mp3",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )

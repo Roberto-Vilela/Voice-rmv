@@ -1,3 +1,14 @@
+FROM python:3.14-slim AS builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --user --no-cache-dir -r requirements.txt
+
 FROM python:3.14-slim
 
 WORKDIR /app
@@ -9,12 +20,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 ENV DENO_INSTALL=/usr/local
+RUN curl -fsSL https://deno.land/install.sh | sh -s -- -y
 
-RUN curl -fsSL https://deno.land/install.sh | sh -s -- -y \
-    && /usr/local/bin/deno --version
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy installed packages from builder
+COPY --from=builder /root/.local /root/.local
+ENV PATH=/root/.local/bin:$PATH
 
 COPY . .
 

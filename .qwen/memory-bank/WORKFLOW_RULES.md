@@ -21,6 +21,17 @@ Sempre que for necessário atualizar arquivos estruturados e sensíveis (como `p
 3.  **SEMPRE** valide o tamanho e a estrutura do arquivo resultante antes e depois da operação (ex: via `git diff`).
 4.  O objetivo é nunca remover informações existentes durante atualizações de histórico.
 
+### 2. Preservação de Histórico e Correções Posteriores
+1.  **NUNCA** substituir ou apagar um registro histórico apenas porque um diagnóstico posterior mostrou que ele estava incompleto ou incorreto.
+2.  Manter o texto anterior e adicionar uma seção como `Correção posterior`, `Adendo` ou `Revisão adicional`, com data e explicação.
+3.  Quando houver contribuição humana decisiva, registrar explicitamente a autoria do diagnóstico sem reescrever o histórico anterior.
+4.  Atualizações de cabeçalho ou status devem preservar datas e estados anteriores como histórico, adicionando a revisão atual separadamente.
+5.  Quando uma informação histórica não for mais válida, adicionar ao lado ou imediatamente abaixo uma referência explícita no formato:
+    - `Esta informação foi alterada; veja o item X.Y para a informação atual.`
+6.  A referência deve apontar para um título ou item numerado estável no mesmo arquivo ou para o caminho completo do arquivo que contém a informação atual.
+7.  Não usar referências vagas como `veja acima`, `veja depois` ou `consulte a versão nova`.
+8.  Se o documento ainda não tiver numeração adequada, criar um identificador claro no novo adendo sem renumerar ou apagar os itens históricos existentes.
+
 ---
 
 ## 📋 Workflow Completo (14 Passos)

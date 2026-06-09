@@ -34,3 +34,19 @@ def convert_to_wav(input_path: str, output_path: str | None = None) -> str:
         check=True, capture_output=True,
     )
     return str(output_path)
+
+
+def get_media_duration(input_path: str) -> float:
+    result = subprocess.run(
+        [
+            "ffprobe",
+            "-v", "error",
+            "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1",
+            str(input_path),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return float(result.stdout.strip())

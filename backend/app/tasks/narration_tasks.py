@@ -1,10 +1,10 @@
 from pathlib import Path
 
 from app.config import settings
-from app.database import update_task, get_db
-from app.services.audio_processor import convert_to_wav, extract_audio
+from app.database import update_task
+from app.services.audio_processor import convert_to_wav, extract_audio, get_media_duration
 from app.services.transcriber import transcribe
-from app.services.tts_engine import synthesize
+from app.services.tts_engine import build_narration_segments, synthesize_with_timing
 from app.services.video_downloader import download_video
 from app.tasks.celery_app import celery_app
 from app.database import run_async
@@ -72,8 +72,14 @@ def narrate_video_url_task(self, url: str, voice: str, task_id: str, language: s
 
         update_task(task_id, progress=75, transcription=text)
 
-        audio_bytes = run_async(synthesize(text, voice))
-        narration_path = _save_narration_audio(task_id, audio_bytes)
+        synthesis = run_async(synthesize_with_timing(text, voice))
+        narration_path = _save_narration_audio(task_id, synthesis["audio"])
+        narration_duration = get_media_duration(narration_path)
+        narration_segments = build_narration_segments(
+            transcription["segments"],
+            synthesis["word_boundaries"],
+            narration_duration,
+        )
 
         _update_task_extra(
             task_id,
@@ -82,6 +88,8 @@ def narrate_video_url_task(self, url: str, voice: str, task_id: str, language: s
                 "source_url": url,
                 "display_name": result["title"],
                 "transcription_segments": transcription["segments"],
+                "narration_segments": narration_segments,
+                "original_duration_seconds": transcription["duration"],
                 "language": transcription["language"],
             },
         )
@@ -90,7 +98,7 @@ def narrate_video_url_task(self, url: str, voice: str, task_id: str, language: s
             status="completed",
             progress=100,
             audio_path=narration_path,
-            duration_seconds=transcription["duration"],
+            duration_seconds=narration_duration,
             transcription=text,
         )
 
@@ -117,10 +125,21 @@ def narrate_audio_file_task(self, file_path: str, voice: str, task_id: str, lang
 
         update_task(task_id, progress=70, transcription=text)
 
-        audio_bytes = run_async(synthesize(text, voice))
-        narration_path = _save_narration_audio(task_id, audio_bytes)
+        synthesis = run_async(synthesize_with_timing(text, voice))
+        narration_path = _save_narration_audio(task_id, synthesis["audio"])
+        narration_duration = get_media_duration(narration_path)
+        narration_segments = build_narration_segments(
+            transcription["segments"],
+            synthesis["word_boundaries"],
+            narration_duration,
+        )
 
-        extra_data = {"transcription_segments": transcription["segments"], "language": transcription["language"]}
+        extra_data = {
+            "transcription_segments": transcription["segments"],
+            "narration_segments": narration_segments,
+            "original_duration_seconds": transcription["duration"],
+            "language": transcription["language"],
+        }
         if early_display:
             extra_data["display_name"] = early_display
 
@@ -131,7 +150,7 @@ def narrate_audio_file_task(self, file_path: str, voice: str, task_id: str, lang
             status="completed",
             progress=100,
             audio_path=narration_path,
-            duration_seconds=transcription["duration"],
+            duration_seconds=narration_duration,
             transcription=text,
         )
 
@@ -160,10 +179,21 @@ def narrate_video_file_task(self, file_path: str, voice: str, task_id: str, lang
 
         update_task(task_id, progress=70, transcription=text)
 
-        audio_bytes = run_async(synthesize(text, voice))
-        narration_path = _save_narration_audio(task_id, audio_bytes)
+        synthesis = run_async(synthesize_with_timing(text, voice))
+        narration_path = _save_narration_audio(task_id, synthesis["audio"])
+        narration_duration = get_media_duration(narration_path)
+        narration_segments = build_narration_segments(
+            transcription["segments"],
+            synthesis["word_boundaries"],
+            narration_duration,
+        )
 
-        extra_data = {"transcription_segments": transcription["segments"], "language": transcription["language"]}
+        extra_data = {
+            "transcription_segments": transcription["segments"],
+            "narration_segments": narration_segments,
+            "original_duration_seconds": transcription["duration"],
+            "language": transcription["language"],
+        }
         if early_display:
             extra_data["display_name"] = early_display
 
@@ -174,7 +204,7 @@ def narrate_video_file_task(self, file_path: str, voice: str, task_id: str, lang
             status="completed",
             progress=100,
             audio_path=narration_path,
-            duration_seconds=transcription["duration"],
+            duration_seconds=narration_duration,
             transcription=text,
         )
 

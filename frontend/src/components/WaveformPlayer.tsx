@@ -19,7 +19,13 @@ function displayName(task: Task): string {
 }
 
 export default function WaveformPlayer({ task, onTimeUpdate }: Props) {
+  const [localTitle, setLocalTitle] = useState<string | null>(null);
+  const title = localTitle || (task ? displayName(task) : "Untitled");
   const wrapperRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    setLocalTitle(null);
+  }, [task?.id]);
   const containerRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -32,10 +38,10 @@ export default function WaveformPlayer({ task, onTimeUpdate }: Props) {
     if (!container) return;
     barsRef.current.forEach((b) => b.remove());
     barsRef.current = [];
-    const count = 100;
+    const count = 48;
     for (let i = 0; i < count; i++) {
       const bar = document.createElement("div");
-      bar.className = "waveform-bar flex-grow bg-secondary-container rounded-t-sm";
+      bar.className = "waveform-bar flex-grow rounded-t-sm min-w-[2px]";
       bar.style.height = `${Math.random() * 80 + 20}%`;
       container.appendChild(bar);
       barsRef.current.push(bar);
@@ -140,11 +146,11 @@ export default function WaveformPlayer({ task, onTimeUpdate }: Props) {
 
   const handleRename = async () => {
     if (!task) return;
-    const current = displayName(task);
+    const current = title;
     const name = prompt("Rename file:", current);
     if (name && name !== current) {
       await patchTask(task.id, { display_name: name });
-      window.location.reload();
+      setLocalTitle(name);
     }
   };
 
@@ -152,14 +158,14 @@ export default function WaveformPlayer({ task, onTimeUpdate }: Props) {
     if (!task?.audio_url) return;
     const fullUrl = `${window.location.origin}${task.audio_url}`;
     if (navigator.share) {
-      await navigator.share({ title: displayName(task), text: task.transcription || "", url: fullUrl });
+      await navigator.share({ title, text: task.transcription || "", url: fullUrl });
     } else {
       await navigator.clipboard.writeText(fullUrl);
       alert("Link copied to clipboard!");
     }
   };
 
-  const total = task?.duration_seconds || duration;
+  const total = duration || task?.duration_seconds || 0;
   const current = currentTime;
 
   if (!task || !task.audio_url) {
@@ -183,12 +189,12 @@ export default function WaveformPlayer({ task, onTimeUpdate }: Props) {
             onClick={handlePlayPause}
             className={`waveform-play-button w-14 h-14 rounded-full bg-primary text-on-primary flex items-center justify-center active:scale-95 transition-transform shadow-lg shadow-primary/20 shrink-0 ${playing ? "is-playing" : ""}`}
           >
-            <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1", fontSize: 32 }}>
+            <span className="material-symbols-outlined icon-filled" style={{ fontSize: 32 }}>
               {playing ? "pause" : "play_arrow"}
             </span>
           </button>
           <div className="min-w-0">
-            <p className="text-label-md text-on-surface truncate">{displayName(task)}</p>
+            <p className="text-label-md text-on-surface truncate">{title}</p>
             <p className="text-body-sm text-on-surface-variant">
               {formatTime(current)} / {formatTime(total)}
             </p>
@@ -211,7 +217,7 @@ export default function WaveformPlayer({ task, onTimeUpdate }: Props) {
           </button>
         </div>
       </div>
-      <div ref={containerRef} className="flex items-end gap-1.5 h-16 w-full px-2" />
+      <div ref={containerRef} className="flex items-end gap-0.5 h-16 w-full px-0.5" />
     </section>
   );
 }

@@ -11,6 +11,13 @@ export interface TaskExtraData {
     text?: string;
     speaker?: string;
   }>;
+  narration_segments?: Array<{
+    start?: number;
+    end?: number;
+    text?: string;
+    speaker?: string;
+  }>;
+  original_duration_seconds?: number;
   editor_segments?: Array<{
     id: string;
     start: number;

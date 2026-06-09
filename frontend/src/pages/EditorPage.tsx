@@ -1,10 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import WaveformPlayer from "../components/WaveformPlayer";
+import { isAxiosError } from "axios";
 import { createUploadTask, createVideoUrlTask } from "../api/tasks";
 import { patchTask } from "../api/client";
 import { useTask, useTasks } from "../api/hooks";
 import type { Task } from "../types";
+
+function getErrorMessage(err: unknown, fallback: string): string {
+  if (isAxiosError(err)) {
+    return err.response?.data?.detail || err.message || fallback;
+  }
+  if (err instanceof Error) return err.message;
+  return fallback;
+}
 
 type EditorSegment = {
   id: string;
@@ -78,6 +87,20 @@ function splitTextIntoChunks(text: string): string[] {
 
 function buildSegments(task: Task | null, draftText: string): EditorSegment[] {
   const editorSegments = task?.extra_data?.editor_segments;
+  const narrationSegments = task?.extra_data?.narration_segments;
+  if (Array.isArray(narrationSegments) && narrationSegments.length > 0) {
+    return narrationSegments.map((segment, index) => {
+      const savedSegment = Array.isArray(editorSegments) ? editorSegments[index] : null;
+      return {
+        id: savedSegment?.id || `segment-${index}`,
+        start: Number(segment.start || 0),
+        end: Number(segment.end || segment.start || 0),
+        speaker: savedSegment?.speaker || segment.speaker || (index % 2 === 0 ? "A" : "B"),
+        html: savedSegment?.html || textToHtml(String(segment.text || "")),
+      };
+    });
+  }
+
   if (Array.isArray(editorSegments) && editorSegments.length > 0) {
     return editorSegments.map((segment, index) => ({
       id: segment.id || `segment-${index}`,
@@ -169,6 +192,7 @@ export default function EditorPage() {
     transcription: currentTask?.transcription || "",
     inputText: currentTask?.input_text || "",
     duration: currentTask?.duration_seconds || 0,
+    narrationSegments: currentTask?.extra_data?.narration_segments || [],
     backendSegments: currentTask?.extra_data?.transcription_segments || [],
     editorSegments: currentTask?.extra_data?.editor_segments || [],
   });
@@ -181,11 +205,8 @@ export default function EditorPage() {
   }, [sourceKey]);
 
   useEffect(() => {
-    console.log("DEBUG: currentTask updated:", currentTask);
-    console.log("DEBUG: transcription_segments:", currentTask?.extra_data?.transcription_segments);
     if (isDirty) return;
     const newSegments = buildSegments(currentTask, draftText);
-    console.log("DEBUG: segments generated:", newSegments);
     setSegments(newSegments);
   }, [currentTask, draftText, isDirty, taskContentKey]);
 
@@ -221,32 +242,51 @@ export default function EditorPage() {
 
   const [activeSegmentIndex, setActiveSegmentIndex] = useState(-1);
 
-  // Use um efeito simples para atualizar o estado apenas quando o índice mudar
   useEffect(() => {
-    // 2.0s de atraso ajustado pelo usuário
-    const SYNC_OFFSET = 2.0; 
-    
-    // Ajustamos o tempo atual do áudio para comparar com os timestamps do segmento
-    // Se o áudio está "atrasado" em relação à transcrição, 
-    // precisamos subtrair o offset do tempo que comparamos.
-    const adjustedTime = Math.max(0, currentTime - SYNC_OFFSET);
-
-    // Só marca se o tempo ajustado for maior que um pequeno threshold (0.1s)
-    const index = adjustedTime > 0.1 ? segments.findIndex((segment) => 
-      adjustedTime >= segment.start && adjustedTime < segment.end
-    ) : -1;
-    
-    if (index !== activeSegmentIndex) {
-      setActiveSegmentIndex(index);
-    }
-  }, [currentTime, segments, activeSegmentIndex]);
+    const index = segments.findIndex(
+      (segment) => currentTime >= segment.start && currentTime < segment.end,
+    );
+    setActiveSegmentIndex((current) => (current === index ? current : index));
+  }, [currentTime, segments]);
 
   const updateSegmentHtml = (id: string, html: string) => {
     setSegments((current) => current.map((segment) => (segment.id === id ? { ...segment, html } : segment)));
     setIsDirty(true);
   };
 
-  const applyCommand = (command: "bold" | "italic" | "underline" | "undo" | "redo") => {
+  const applyFormat = (format: "bold" | "italic" | "underline") => {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount || sel.isCollapsed) return;
+
+    const range = sel.getRangeAt(0);
+    const container = range.commonAncestorContainer;
+    const editor = (container.nodeType === 3 ? container.parentElement : container as HTMLElement)
+      ?.closest?.("[contentEditable]") as HTMLElement | null;
+    if (!editor) return;
+
+    const tagMap: Record<string, string> = { bold: "strong", italic: "em", underline: "u" };
+    const tag = tagMap[format];
+    if (!tag) return;
+
+    try {
+      const fragment = range.extractContents();
+      const wrapper = document.createElement(tag);
+      wrapper.appendChild(fragment);
+      range.insertNode(wrapper);
+
+      sel.removeAllRanges();
+      const newRange = document.createRange();
+      newRange.selectNodeContents(wrapper);
+      sel.addRange(newRange);
+
+      const segmentId = editor.dataset.segmentId;
+      if (segmentId) updateSegmentHtml(segmentId, editor.innerHTML);
+    } catch {
+      // fallback silently
+    }
+  };
+
+  const applyCommand = (command: "undo" | "redo") => {
     document.execCommand(command, false);
   };
 
@@ -275,8 +315,8 @@ export default function EditorPage() {
       if (mode === "manual") {
         setError(null);
       }
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || err?.message || "Unable to save changes.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Unable to save changes."));
     } finally {
       setIsSaving(false);
     }
@@ -297,8 +337,8 @@ export default function EditorPage() {
     try {
       const task = await createUploadTask(file, currentVoice);
       navigate(`/editor?taskId=${task.id}`);
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || err?.message || "Upload failed.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Upload failed."));
     }
   };
 
@@ -308,42 +348,31 @@ export default function EditorPage() {
       const task = await createVideoUrlTask(youtubeUrl.trim(), currentVoice);
       setYoutubeUrl("");
       navigate(`/editor?taskId=${task.id}`);
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || err?.message || "Could not load the YouTube link.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Could not load the YouTube link."));
     }
   };
 
   return (
     <div ref={revealScopeRef} className="space-y-stack-lg pb-24 md:pb-12">
-      <header className="sticky top-0 z-40 bg-surface shadow-sm h-16 rounded-b-xl">
-        <div className="flex justify-between items-center px-margin-mobile md:px-margin-desktop h-16 w-full max-w-container-max mx-auto">
-          <div className="flex items-center gap-4">
-            <button
-              className="active:scale-95 transition-transform hover:opacity-80 p-2 text-on-surface"
-              onClick={() => navigate(-1)}
-            >
-              <span className="material-symbols-outlined">arrow_back</span>
-            </button>
-            <h1 className="text-headline-md font-bold text-primary">Transcription Editor</h1>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={exportSrt}
-              className="hidden md:flex items-center gap-2 px-4 py-2 text-secondary font-label-md hover:bg-secondary-container/20 rounded-xl transition-all"
-            >
-              <span className="material-symbols-outlined">file_download</span>
-              Export
-            </button>
-            <div className="w-10 h-10 rounded-full bg-surface-container-highest border border-outline-variant overflow-hidden">
-              <img
-                alt="User Profile"
-                className="w-full h-full object-cover"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuAaQkJl7m1zq2PZWPVooxc2c7Xk7Tt-vyCbnJL6QtmGU4zk6WrOjI4TTtTFexg0VuZm2OFVM5t5qqhou_K-r0RlJL5D-lCY1_36vit0eOPRqEgLMtiOg3HEjWKiGtMNcqPKZsMLS7_eQ8gwfsUCsyPwyW4uYFvhvBUsfjBbDFFo3NeFvb-VMoYeNDTTyVO4_qW_JdE_b6S9suRomvDMngZLb982_jRxUJCHBqUMqtjGNEcF49bxqJpp4GwZnCXrYIa47FHD7MVgpg"
-              />
-            </div>
-          </div>
+      <div className="flex items-center justify-between px-margin-mobile md:px-0">
+        <div className="flex items-center gap-4">
+          <button
+            className="active:scale-95 transition-transform hover:opacity-80 p-2 text-on-surface"
+            onClick={() => navigate(-1)}
+          >
+            <span className="material-symbols-outlined">arrow_back</span>
+          </button>
+          <h1 className="text-headline-md font-bold text-primary">Transcription Editor</h1>
         </div>
-      </header>
+        <button
+          onClick={exportSrt}
+          className="hidden md:flex items-center gap-2 px-4 py-2 text-secondary font-label-md hover:bg-secondary-container/20 rounded-xl transition-all"
+        >
+          <span className="material-symbols-outlined">file_download</span>
+          Export
+        </button>
+      </div>
 
       <main className="max-w-container-max mx-auto lg:flex lg:flex-row lg:gap-gutter lg:p-gutter lg:h-[calc(100vh-128px)]">
         <aside className="lg:w-[400px] lg:flex-shrink-0">
@@ -415,13 +444,13 @@ export default function EditorPage() {
         <div className="flex-1 min-w-0 flex flex-col h-full">
           <div data-reveal className="reveal-card hover-lift mt-stack-md lg:mt-0 bg-surface border border-outline-variant rounded-xl p-2 flex flex-wrap items-center gap-2 sticky top-[17rem] md:top-[12rem] lg:static z-20 shadow-sm mb-4">
             <div className="flex items-center gap-1 border-r border-outline-variant pr-2">
-              <button className="p-2 hover:bg-surface-container rounded-lg text-on-surface-variant" title="Bold" onMouseDown={(e) => e.preventDefault()} onClick={() => applyCommand("bold")}>
+              <button className="p-2 hover:bg-surface-container rounded-lg text-on-surface-variant" title="Bold" onMouseDown={(e) => e.preventDefault()} onClick={() => applyFormat("bold")}>
                 <span className="material-symbols-outlined">format_bold</span>
               </button>
-              <button className="p-2 hover:bg-surface-container rounded-lg text-on-surface-variant" title="Italic" onMouseDown={(e) => e.preventDefault()} onClick={() => applyCommand("italic")}>
+              <button className="p-2 hover:bg-surface-container rounded-lg text-on-surface-variant" title="Italic" onMouseDown={(e) => e.preventDefault()} onClick={() => applyFormat("italic")}>
                 <span className="material-symbols-outlined">format_italic</span>
               </button>
-              <button className="p-2 hover:bg-surface-container rounded-lg text-on-surface-variant" title="Underline" onMouseDown={(e) => e.preventDefault()} onClick={() => applyCommand("underline")}>
+              <button className="p-2 hover:bg-surface-container rounded-lg text-on-surface-variant" title="Underline" onMouseDown={(e) => e.preventDefault()} onClick={() => applyFormat("underline")}>
                 <span className="material-symbols-outlined">format_underlined</span>
               </button>
             </div>
@@ -465,6 +494,7 @@ export default function EditorPage() {
                         </div>
                         <div
                           contentEditable
+                          data-segment-id={segment.id}
                           suppressContentEditableWarning
                           spellCheck={false}
                           className={`outline-none focus:ring-2 focus:ring-primary/10 rounded p-1 text-body-md text-on-surface leading-relaxed`}
@@ -488,7 +518,7 @@ export default function EditorPage() {
           onClick={() => void saveChanges("manual")}
           disabled={isSaving || !currentTask?.id}
         >
-        <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>save</span>
+        <span className="material-symbols-outlined icon-filled">save</span>
         <span className="font-label-md">Save Changes</span>
       </button>
 

@@ -3,6 +3,93 @@
 **Last Updated:** 2026-06-08  
 **Status:** Functional core validated; frontend and backend still have known gaps
 
+**Revisão adicional:** 2026-06-09
+
+### 2026-06-09 — Fix waveform bars invisíveis no Editor + verificação auto-save
+
+**Problema:** As barras do waveform no Editor não apareciam visualmente, apesar de estarem no DOM.
+
+**Diagnóstico (2 causas):**
+1. **Layout overflow:** 100 barras × `gap-1.5` (6px) = 594px só de gaps — maior que qualquer container mobile/editor, forçando `flex-grow` a distribuir espaço negativo → barras com **0px de largura**
+2. **Baixo contraste:** `bg-secondary-container` (#57dffe) sobre `bg-white` (#ffffff) tem contraste ~1.6:1 — praticamente invisível
+
+**Solução:**
+- Reduzido número de barras: 100 → 48
+- Reduzido gap: `gap-1.5` (6px) → `gap-0.5` (2px)
+- Adicionado `min-w-[2px]` para evitar colapso total
+- Idle bars agora usam gradiente visível (0.5 opacidade) igual ao playing mas mais sutil
+- Removido `bg-secondary-container` das barras (gradiente no CSS resolve)
+
+**Verificação auto-save:** O mecanismo está correto — `useEffect` com debounce de 1s chama `saveChanges("auto")` que faz PATCH para `/api/tasks/{id}` com `transcription` + `editor_segments`. Backend faz merge corretamente (history.py:89-96). Única limitação: não salva se página for fechada abruptamente.
+
+**Arquivos alterados:**
+- `frontend/src/components/WaveformPlayer.tsx` (count, gap, min-w)
+- `frontend/src/index.css` (idle gradient opacity)
+
+### 2026-06-09 — Fase 3: Design rules + Type safety
+
+- Inline styles `fontVariationSettings` substituídos por classe `.icon-filled` no `index.css`
+- `catch (err: any)` substituído por `catch (err: unknown)` + `getErrorMessage()` com `isAxiosError`
+- Adicionada função helper `getErrorMessage()` no `EditorPage.tsx`
+
+### 2026-06-09 — Análise do módulo Editor (Fase 1)
+
+**Módulo Editor — análise completa concluída (3 fases).**
+- 18 achados identificados inicialmente, todos tratados ou já resolvidos
+
+**Escopo:** Correção item por item dos 18 achados no Editor, validados pelo usuário a cada entrega.
+
+**Item 1 concluído:** Removido `TranscriptionView.tsx` — componente placeholder de 5 linhas que nunca era importado em lugar nenhum. Build TypeScript validado.
+
+**Item 2 concluído:** Adicionadas classes CSS `active-row`, `zebra-row`, `desktop-content-height` ao `index.css`. Validação visual do usuário aprovada.
+
+**Item 4 — Race condition do Audio:** Já resolvido nas refatorações anteriores (06-06-09). Pulado.
+
+**Item 5 — seekTo no segmento:** Já resolvido — sincronização funciona via `onTimeUpdate` + `activeSegmentIndex`.
+
+**Item 6 concluído:** `document.execCommand()` substituído por `applyFormat()` com Range API (Selection API + `range.extractContents()` + `insertNode()`). Bold/Italic/Underline sem API deprecada. Undo/Redo mantidos com `execCommand` (gatilho para desfazer nativo do navegador).
+
+**Fase 1 completa.**
+
+### 2026-06-09 — Fase 2: Layout conflict (double header)
+
+**Problema:** EditorPage renderizava dentro do AppLayout (TopBar + Sidebar + BottomNav) E tinha seu próprio `header` sticky com back/title/export/profile — resultando em 2 headers, 2 fotos de perfil, z-index competindo.
+
+**Solução:** Removido sticky header do Editor. Substituído por um cabeçalho de página simples (back + title + export) no fluxo do conteúdo, estilo Dashboard. Profile pic removida (agora única no TopBar/Sidebar).
+
+### 2026-06-09 — Sincronização do Editor com a narração TTS
+
+**Problema validado:**
+- O Editor reproduzia o áudio sintetizado pela voz escolhida, mas destacava a transcrição usando timestamps extraídos pelo Whisper do áudio original.
+- Como o ritmo, as pausas e a duração da narração TTS são diferentes do áudio original, offsets fixos não mantinham a sincronização, especialmente em frases curtas.
+
+**Diagnóstico humano:**
+- O usuário identificou que o problema já não era apenas um atraso constante. A causa real era a existência de duas linhas do tempo diferentes: áudio original e voz narrada.
+- A sessão anterior estava sendo conduzida com Gemini; a tentativa aplicada com offset fixo não resolveu estruturalmente o problema.
+
+**Solução validada pelo usuário:**
+- `edge-tts` agora emite eventos `WordBoundary` durante a síntese.
+- As tasks criam `narration_segments` alinhados à voz sintetizada.
+- `duration_seconds` passa a representar a duração real do MP3 narrado, obtida com `ffprobe`.
+- Os timestamps originais do Whisper continuam preservados em `transcription_segments`.
+- A duração original é preservada em `original_duration_seconds`.
+- O Editor prioriza `narration_segments` para o destaque visual.
+- O destaque ativo voltou a atualizar `activeSegmentIndex` corretamente.
+
+**Validação humana:**
+- O usuário recriou o worker, gerou uma nova task e confirmou que áudio e marcação passaram a funcionar sincronizados.
+- Tasks antigas não recebem retroativamente `narration_segments`.
+
+**Arquivos alterados:**
+- `backend/app/services/tts_engine.py`
+- `backend/app/services/audio_processor.py`
+- `backend/app/tasks/narration_tasks.py`
+- `backend/tests/test_tts.py`
+- `backend/tests/test_audio_processor.py`
+- `frontend/src/pages/EditorPage.tsx`
+- `frontend/src/components/WaveformPlayer.tsx`
+- `frontend/src/types.ts`
+
 ### 2026-06-08 (tarde)
 
 - Aumentada largura mínima do input de URL no `HeroSection` (`min-w-0` → `lg:min-w-[400px]`)
@@ -50,6 +137,8 @@
 
 ### 2026-06-08 (noite) — Correção da Sincronização de Áudio (Highlight Sync)
 
+> **Referência atual:** Esta informação foi alterada; veja o item **2026-06-09 — Sincronização do Editor com a narração TTS** para a informação atual.
+
 **Bugs corrigidos:**
 - Problema de "aceleração" visual no destaque das transcrições (desync entre áudio e texto).
 - **Solução:** A solução foi identificada pelo **humano (usuário)**, que observou um atraso consistente de 1.5s - 2.0s entre o áudio e a transcrição. Através de observação empírica, o usuário sugeriu a implementação de um offset fixo para alinhar o playback.
@@ -60,6 +149,12 @@
 **Arquivos alterados:**
 - `frontend/src/pages/EditorPage.tsx`
 - `frontend/src/components/WaveformPlayer.tsx`
+
+**Correção posterior — 2026-06-09:**
+- O registro acima foi preservado como histórico da tentativa feita durante o trabalho anterior com Gemini.
+- O offset fixo não resolveu estruturalmente o problema porque o áudio reproduzido era a narração TTS, enquanto os timestamps pertenciam ao áudio original.
+- O usuário identificou essa diferença entre as duas linhas do tempo.
+- O diagnóstico definitivo e a solução validada estão registrados na entrada de 2026-06-09.
 
 ---
 
@@ -134,6 +229,7 @@ Estado atual validado nesta revisão:
 - Hero de URL do YouTube integrado ao backend
 - Seleção de voz funcional no hero
 - Feedback de erro mais claro para usuário final
+- Editor sincroniza o destaque com a linha do tempo da narração TTS em tasks novas
 
 ---
 

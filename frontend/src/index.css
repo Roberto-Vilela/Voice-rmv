@@ -107,6 +107,7 @@ body {
 
 .waveform-bar {
   transition: height 0.2s ease;
+  background: linear-gradient(180deg, rgba(87, 223, 254, 0.5) 0%, rgba(53, 37, 205, 0.5) 100%);
 }
 
 .waveform-player[data-playing="true"] .waveform-bar {
@@ -181,4 +182,29 @@ body {
 .sidebar-item.active .material-symbols-outlined,
 .sidebar-item.active span {
   color: #ffffff !important;
+}
+
+/* Editor page */
+.active-row {
+  background-color: rgba(53, 37, 205, 0.06);
+  border-left: 3px solid var(--color-primary, #3525cd);
+  border-radius: 0.75rem;
+}
+
+.zebra-row {
+  background-color: transparent;
+}
+
+.zebra-row:nth-child(even) {
+  background-color: rgba(53, 37, 205, 0.02);
+}
+
+@media (min-width: 1024px) {
+  .desktop-content-height {
+    max-height: calc(100vh - 320px);
+  }
+}
+
+.icon-filled {
+  font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24;
 }
