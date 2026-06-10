@@ -16,7 +16,7 @@ class TestVoices:
 
 
 class TestNarrateText:
-    async def test_narrate_text_success(self, client, mock_synthesize):
+    async def test_narrate_text_success(self, client, mock_text_task_delay):
         resp = await client.post(
             "/api/narrate/text",
             json={"text": "Olá mundo", "voice": "en-US-AriaNeural"},
@@ -24,16 +24,18 @@ class TestNarrateText:
 
         assert resp.status_code == 200
         data = resp.json()
-        assert data["status"] == "completed"
-        assert data["progress"] == 100
+        assert data["status"] == "pending"
+        assert data["progress"] == 0
         assert data["input_text"] == "Olá mundo"
         assert data["voice"] == "en-US-AriaNeural"
         assert data["type"] == "text"
-        assert data["audio_url"] is not None
+        assert data["audio_url"] is None
         assert data["error"] is None
-        mock_synthesize.assert_awaited_once_with("Olá mundo", "en-US-AriaNeural")
+        mock_text_task_delay.assert_called_once_with(
+            "Olá mundo", "en-US-AriaNeural", data["id"], 1.0, 0, 1.0
+        )
 
-    async def test_narrate_text_default_voice(self, client, mock_synthesize):
+    async def test_narrate_text_default_voice(self, client, mock_text_task_delay):
         resp = await client.post(
             "/api/narrate/text",
             json={"text": "teste"},
@@ -42,19 +44,16 @@ class TestNarrateText:
         assert resp.status_code == 200
         data = resp.json()
         assert data["voice"] == "en-US-AriaNeural"
+        mock_text_task_delay.assert_called_once()
 
-    async def test_narrate_text_synthesize_error(self, client, mock_synthesize):
-        mock_synthesize.side_effect = RuntimeError("Falha no TTS")
+    async def test_narrate_text_synthesize_error(self, client, mock_text_task_delay):
+        mock_text_task_delay.side_effect = RuntimeError("Celery error")
 
-        resp = await client.post(
-            "/api/narrate/text",
-            json={"text": "teste"},
-        )
-
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["status"] == "error"
-        assert data["error"] == "Falha no TTS"
+        with pytest.raises(RuntimeError, match="Celery error"):
+            await client.post(
+                "/api/narrate/text",
+                json={"text": "teste"},
+            )
 
 
 class TestNarrateVideoUrl:

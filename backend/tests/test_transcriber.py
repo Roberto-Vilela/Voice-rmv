@@ -31,7 +31,12 @@ def test_transcribe_returns_correct_structure(mock_whisper_model):
         assert result["duration"] == 2.5
         assert result["language"] == "en"
 
-        mock_whisper_model.transcribe.assert_called_once_with("/fake/path.wav", task="transcribe")
+        mock_whisper_model.transcribe.assert_called_once_with(
+            "/fake/path.wav",
+            task="transcribe",
+            language=None,
+            word_timestamps=True,
+        )
 
 
 def test_transcribe_calls_get_model(mock_whisper_model):

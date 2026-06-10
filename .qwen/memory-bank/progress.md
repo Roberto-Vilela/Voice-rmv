@@ -1,9 +1,71 @@
 # Voice-RMV — Progress Report
 
-**Last Updated:** 2026-06-08  
-**Status:** Functional core validated; frontend and backend still have known gaps
+**Last Updated:** 2026-06-10  
+**Status:** 19/24 itens VoiceOverPage resolvidos; segurança backend implementada
 
-**Revisão adicional:** 2026-06-09
+### 2026-06-09 — VoiceOverPage Problemas 1, 2, 3 + workflow learning
+
+**Workflow learning:** Durante Problema 1, apresentei plano e aguardei aprovação ✅. Durante Problema 2, pulei o plano (steps 5-6) e pulei a validação humana (step 8). O usuário apontou ambas as falhas. Workflow exige: **apresentar plano (steps 5-6)** → executar → **listar testes → PARAR e aguardar validação (step 8)** → só então wrap-up (steps 9-14).
+
+**Problema 1 — Speed/Pitch/Volume sliders + Voice personas:**
+- Backend: `schemas.py` (speed, pitch, volume), `tts_engine.py` (rate/pitch/volume params), `narrate.py` (passa body params)
+- Frontend: `client.ts` + `tasks.ts` + `VoiceOverPage.tsx` (3 sliders, volume novo, language filter All/PT/EN, 12 persona cards com ícones, View All expande grid)
+- Voice personas revisadas: mapeamento validado contra API real (Davis/Tony/Sara não existiam → corrigido para Andrew/Roger/Ana; adicionado pt-PT Duarte + Raquel)
+- Testes manuais validados pelo usuário ✅
+
+**Problema 2 — Text task síncrona → Celery async:** ✅
+- Criada `narrate_text_task` em `narration_tasks.py:43` (segue mesmo padrão: `run_async(synthesize(...))` → `_save_narration_audio()` → `update_task(completed)`)
+- `/text` endpoint agora cria task `pending` → `narrate_text_task.delay(...)` → retorna imediatamente
+- Speed/pitch/volume preservados na task
+- Containers api + celery_worker rebuildos
+- Testes manuais validados pelo usuário ✅ (curl retornou `pending`, poll mostrou `completed` com `audio_url`)
+
+**Problema 3 — `catch (err: any)` → `getErrorMessage()`:** ✅
+- Criado `frontend/src/utils/errors.ts` com `getErrorMessage()` (DRY, `isAxiosError` + `instanceof Error`)
+- `EditorPage.tsx`: removeu função local, importa de `../utils/errors`
+- `VoiceOverPage.tsx`: `catch (err: unknown)` + `getErrorMessage(err, fallback)`
+- Build validado (162 modules)
+
+**Problema 4 — `fontVariationSettings` inline → `.icon-filled`:** ✅
+- `VoiceOverPage.tsx:279`: inline `style` substituído pela classe `.icon-filled`
+- Padronizado com EditorPage e WaveformPlayer (que já usavam `.icon-filled`)
+
+**Item #6 — "Advanced Modulation" placeholder removido:** ✅
+- Botão + placeholder removidos — speed/pitch/volume já expostos como sliders diretos, edge-tts não tem mais parâmetros
+- `advanced` state removido
+- Bundle -0.49 kB
+
+**Item #10 — Reveal observer eficiente:** ✅
+- Deps alterado de `[generatedTask?.id, script, selectedVoice]` → só `[generatedTask?.id]`
+- Observer não reconecta ao digitar (script) ou trocar voz (selectedVoice)
+
+**Item #11 — Preview section sem `hover-lift`:** ✅
+- Classe `hover-lift` removida da preview section
+
+**Item #12 — Textarea sem `maxLength`:** ✅
+- Frontend: `maxLength={5000}` no textarea — bloqueia digitação + colagem
+- Backend: `Field(max_length=5000)` no `NarrateTextRequest` — valida 422 no POST
+
+**Item #13 — Error toast sem auto-dismiss:** ✅
+- `useEffect` com `setTimeout(6000)` → `setError(null)` com cleanup
+- Botão X no toast para fechamento manual
+- Layout flex com ícone close
+
+**Micro-interações suaves (UX):** ✅
+- `index.css`: novas classes `.card-hover`, `.btn-glow`, `.filter-pill`, `.toast-slide`, `.stagger-1` a `.stagger-8`
+- Voice cards: hover sobe 4px + sombra + ícone animado
+- Generate button: brilho roxo + escala 1.02 no hover
+- Language filters: transição suave + sobe 1px
+- Error toast: animação slide-in ao aparecer
+- Build validado (CSS 54→55 kB)
+
+**Problema (queue) — Polling + Waveform sem barras:** ✅
+- **Causa 1:** `generateAudio()` criava task `pending` mas nunca polling para `completed` → UI ficava travada em "No audio yet."
+  - Fix: adicionado `setInterval` de 1s chamando `getTask(id)` até `completed` ou `error`
+- **Causa 2:** `WaveformPlayer` só criava barras com dep `[task?.id]`. Transição `pending`→`completed` mantinha mesmo `id`, então `useEffect` não re-executava
+  - Fix: adicionado `task?.audio_url` às deps do efeito de criação de barras
+- `VoiceOverPage.tsx`: polling + import `getTask`
+- `WaveformPlayer.tsx`: dep `task?.audio_url`
 
 ### 2026-06-09 — Fix waveform bars invisíveis no Editor + verificação auto-save
 
@@ -270,3 +332,51 @@ podman-compose logs --tail=80 celery_worker
 - Para detalhes de arquitetura e gaps, consultar:
   - `/mnt/projetos/voice-rmv/.qwen/REPORTO_BACKEND_ANALISE.md`
   - `/mnt/projetos/voice-rmv/.qwen/FRONTEND_ANALYSIS.md`
+
+---
+
+### 2026-06-10 — Items 16-19: Segurança (CORS, Rate Limit, Auth, Output)
+
+**Itens resolvidos do checklist VoiceOverPage:**
+
+| # | Item | Status | Resumo |
+|---|------|--------|--------|
+| 16 | CORS `allow_origins=["*"]` | ✅ | Restrito a origens configuráveis via `CORS_ORIGINS` env var. Default: `localhost:5173,localhost:8456`. |
+| 17 | Sem rate limiting | ✅ | `RateLimitMiddleware` com Redis (fallback memória). Global 60 req/min, `/api/narrate/` 10 req/min, `/api/tasks` 120 req/min, `/api/output` 120 req/min. |
+| 18 | Sem auth/authentication | ✅ | `verify_api_key()` dependency via header `X-API-Key`. Se `API_KEY` não configurada → dev mode (sem auth). |
+| 19 | `/api/output` sem acesso controlado | ✅ | Substituído `StaticFiles` mount por router com `FileResponse` + verificação de auth. |
+
+**Arquivos criados:**
+- `backend/app/middleware/__init__.py` — pacote middleware
+- `backend/app/middleware/auth.py` — verificação de API key
+- `backend/app/middleware/rate_limit.py` — rate limiter (Redis + fallback memória)
+- `backend/app/middleware/rate_limit_middleware.py` — middleware ASGI com limites por path
+- `backend/app/routers/output.py` — endpoint controlado para servir arquivos de áudio
+
+**Arquivos modificados:**
+- `backend/app/config.py` — adicionado `cors_origins`, `api_key`, `rate_limit_enabled`
+- `backend/app/main.py` — CORS restrito, auth dependency, rate limit middleware, output router
+- `docker-compose.yml` — adicionado `CORS_ORIGINS` e `API_KEY` env vars
+- `backend/tests/conftest.py` — `mock_text_task_delay` fixture, `disable_rate_limit` autouse
+- `backend/tests/test_narrate_api.py` — tests refatorados para Celery async
+- `backend/tests/test_transcriber.py` — assert ajustado para `language=None, word_timestamps=True`
+
+**Testes automatizados:** 30/30 passando
+
+**Validação humana (resultados):**
+| Teste | Resultado |
+|-------|-----------|
+| CORS `Origin: evil.com` → sem `Access-Control-Allow-Origin` | ✅ |
+| CORS `Origin: localhost:5173` → com header | ✅ |
+| Rate limit /api/narrate/ 10 req/min → requests 1-10=200, 11-15=429 | ✅ |
+| Auth key errada (`X-API-Key: wrong`) → 401 | ✅ |
+| Auth key correta (`X-API-Key: my-secret-key`) → 200 | ✅ |
+| Dev mode (sem API_KEY) → 200 sem header | ✅ |
+| Output `/api/output/inexistente.mp3` → 404 | ✅ |
+
+**Learnings:**
+- `docker-compose.yml` precisa referenciar `API_KEY: ${API_KEY-}` para passar env var do shell para o container — prefixo `VAR=value docker compose` não injeta automaticamente
+- Rate limiter deve ser desabilitado em testes via `disable_rate_limit` fixture (autouse) para evitar falsos positivos
+- `request.client` pode ser `None` em testes ASGI (httpx ASGITransport) — necessário fallback para "test"
+- `redis.asyncio` está disponível no pacote `redis>=5.2.0` já existente nas dependências
+- Testes de texto narrate precisaram ser refatorados de síncrono (mock `synthesize`) para async (mock `narrate_text_task.delay`) após migração Celery

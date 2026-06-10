@@ -36,6 +36,8 @@ services:
       REDIS_URL: redis://redis:6379/0
       OUTPUT_DIR: /output
       TEMP_DIR: /temp
+      CORS_ORIGINS: http://localhost:5173,http://api:8456
+      API_KEY: ${API_KEY-}
     volumes:
       - ./backend:/app:Z
       - /app/app/__pycache__

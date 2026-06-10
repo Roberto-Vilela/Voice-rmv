@@ -17,9 +17,11 @@ async def client():
 
 
 @pytest.fixture
-def mock_synthesize():
-    with patch("app.routers.narrate.synthesize", new_callable=AsyncMock) as mock:
-        mock.return_value = b"fake_audio_bytes"
+def mock_text_task_delay():
+    with patch(
+        "app.routers.narrate.narrate_text_task.delay",
+        new_callable=MagicMock,
+    ) as mock:
         yield mock
 
 
@@ -76,6 +78,12 @@ def mock_db_session():
     session.execute = AsyncMock(return_value=result_mock)
 
     return session
+
+
+@pytest.fixture(autouse=True)
+def disable_rate_limit():
+    with patch("app.config.settings.rate_limit_enabled", False):
+        yield
 
 
 @pytest.fixture(autouse=True)

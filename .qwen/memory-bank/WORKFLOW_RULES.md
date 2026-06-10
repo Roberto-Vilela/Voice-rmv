@@ -529,6 +529,56 @@ npm run test
 ---
 
 *Workflow Oficial de Execução — Voice-RMV*  
-*Última atualização: 2026-06-08*  
+*Última atualização: 2026-06-09*  
 *Status: Validado e em Uso*  
 *Passo 8: TESTES PRINCIPAIS (CRÍTICO!)*
+
+---
+
+## 📌 Anexo: VoiceOverPage — Workflow de Correção Dirigida
+
+Quando o módulo alvo for **VoiceOverPage**, aplicar estas adaptações ao workflow padrão:
+
+### 1. Fonte de Verdade
+
+Consultar obrigatoriamente antes de qualquer ação:
+
+| Fonte | Conteúdo |
+|-------|----------|
+| `.qwen/memory-bank/voiceoverpage_analise.md` | Checklist mestre dos 24 achados |
+| `.qwen/memory-bank/` (progress.md, DESIGNER_RULES.md, techContext.md) | Soluções similares já aplicadas, regras de design |
+| Código atual | Estado real de cada arquivo antes de alterar |
+
+### 2. Ciclo Item a Item
+
+```
+Usuário indica item → Modelo consulta análise.md → Pesquisa memory/código
+→ Apresenta plano completo (problema, viabilidade, riscos, alternativas, arquivos)
+→ Usuário aprova → Executa → Lista testes para humano
+→ Humano testa:
+    ├── Passou → Documenta em voiceoverpage_analise.md + progress.md + memory
+    └── Falhou → Volta ao início do ciclo
+```
+
+### 3. Plano Completo (Formato Obrigatório)
+
+Cada item deve conter no plano antes da execução:
+
+- **Problema:** arquivo + linha + descrição
+- **Viabilidade:** complexidade (Baixa/Média/Alta)
+- **Riscos:** o que pode quebrar
+- **Alternativas:** se houver mais de uma abordagem
+- **Arquivos a modificar:** lista exata
+- **Testes:** comandos + cenários manuais
+
+### 4. Documentação ao Final (Sempre)
+
+Após cada item aprovado e validado:
+
+1. Atualizar `voiceoverpage_analise.md` — marcar item como `✅` e adicionar draft do que foi feito (sem apagar o checklist original)
+2. Atualizar `progress.md` — entrada do dia com o item
+3. Atualizar `MEMORY.md` — quick facts se necessário
+
+### 5. Regra de Ouro
+
+**NUNCA** apagar itens do checklist original em `voiceoverpage_analise.md`. Itens resolvidos recebem `✅` + draft abaixo. Itens não resolvidos permanecem intactos.
