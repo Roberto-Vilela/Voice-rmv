@@ -1,7 +1,7 @@
 # Voice-RMV — Progress Report
 
 **Last Updated:** 2026-06-10  
-**Status:** 19/24 itens VoiceOverPage resolvidos; segurança backend implementada
+**Status:** 24/24 itens VoiceOverPage resolvidos ✅
 
 ### 2026-06-09 — VoiceOverPage Problemas 1, 2, 3 + workflow learning
 
@@ -380,3 +380,21 @@ podman-compose logs --tail=80 celery_worker
 - `request.client` pode ser `None` em testes ASGI (httpx ASGITransport) — necessário fallback para "test"
 - `redis.asyncio` está disponível no pacote `redis>=5.2.0` já existente nas dependências
 - Testes de texto narrate precisaram ser refatorados de síncrono (mock `synthesize`) para async (mock `narrate_text_task.delay`) após migração Celery
+
+---
+
+### 2026-06-10 — Items 23, 24: Button padding + Voices skeleton (VoiceOverPage)
+
+**#23 — Botão primário padding ajustado:** ✅
+- Generate & Record button: `py-4` → `h-12 px-8`, `font-headline-md` → `font-semibold`, `active:scale-[0.98]` → `active:scale-95`
+- Alinhado com DESIGNER_RULES.md sec.4 (botões: `h-11 px-6 rounded-lg font-semibold active:scale-95`)
+
+**#24 — Loading voices skeleton:** ✅
+- Texto "Loading voices…" substituído por 4 skeleton cards com `animate-pulse`
+- Layout: círculo 40px + 2 barras de texto, mesma estrutura dos voice cards
+
+**Checklist completo:** 24/24 itens do VoiceOverPage resolvidos e validados pelo usuário.
+
+**Arquivo alterado:** `frontend/src/pages/VoiceOverPage.tsx`
+
+**Testes manuais validados pelo usuário:** ✅
