@@ -201,7 +201,17 @@ export default function VoiceOverPage() {
               <button className="text-primary font-label-md text-label-md hover:underline" onClick={() => setShowAllVoices((v) => !v)}>{showAllVoices ? "Show Less" : "View All"}</button>
             </div>
             {voicesLoading ? (
-              <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 text-on-surface-variant">Loading voices…</div>
+              <div className="grid grid-cols-2 gap-3">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-surface-container-lowest border border-outline-variant animate-pulse">
+                    <div className="w-10 h-10 rounded-full bg-outline-variant" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-3 w-24 bg-outline-variant rounded" />
+                      <div className="h-2 w-16 bg-outline-variant rounded" />
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : (
               <>
                 <div className="flex gap-2 mb-4">
@@ -310,7 +320,7 @@ export default function VoiceOverPage() {
 
           <button
             data-reveal
-            className="btn-glow reveal-card hover-lift w-full bg-primary hover:bg-on-primary-fixed-variant text-on-primary font-headline-md py-4 rounded-xl shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-3 group disabled:opacity-60 disabled:cursor-not-allowed"
+            className="btn-glow reveal-card hover-lift w-full bg-primary hover:bg-on-primary-fixed-variant text-on-primary font-semibold h-12 px-8 rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-3 group disabled:opacity-60 disabled:cursor-not-allowed"
             onClick={() => void generateAudio()}
             disabled={isGenerating || !script.trim()}
           >
