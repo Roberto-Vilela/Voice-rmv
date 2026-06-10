@@ -529,9 +529,68 @@ npm run test
 ---
 
 *Workflow Oficial de Execução — Voice-RMV*  
-*Última atualização: 2026-06-09*  
+*Última atualização: 2026-06-10*  
 *Status: Validado e em Uso*  
 *Passo 8: TESTES PRINCIPAIS (CRÍTICO!)*
+
+---
+
+## 🧩 Regra: Formato Obrigatório do Plano (Passos 5-6)
+
+Antes de qualquer execução, o plano apresentado ao usuário DEVE conter obrigatoriamente todos os itens abaixo. Planos incompletos serão rejeitados.
+
+### Estrutura Obrigatória
+
+| Seção | O que conter | Exemplo |
+|-------|-------------|---------|
+| **O que deve ser feito** | Explicação clara do problema e da solução proposta, em linguagem de usuário (não técnica) | "O total de tasks retornado pela API está errado — mostra o número da página atual em vez do total no banco." |
+| **Arquivos utilizados** | Lista exata de arquivos que serão modificados/criados, com caminho completo, linha afetada e justificativa de por que cada um precisa ser alterado | `backend/app/routers/history.py:29` — contém a query que calcula `total` |
+| **Técnica** | Abordagem específica de implementação com justificativa técnica | `select(func.count(Task.id))` do SQLAlchemy para count separado, porque é padrão do ORM e não adiciona latência significativa |
+| **Mini draft** | Esboço das partes importantes do código NOVO, SEM alterar o arquivo ainda. Apenas para mostrar a direção. | `total = (await db.execute(select(func.count(Task.id)))).scalar()` |
+| **Riscos** | Tabela com riscos, impacto e mitigação | Query extra por request → impacto insignificante porque `count(*)` é O(1) no PostgreSQL |
+| **Viabilidade** | Alta/Média/Baixa com justificativa | Alta — mudança localizada de 3 linhas, nenhuma dependência externa |
+| **Fallback** | O que fazer se a abordagem principal falhar | Usar `len(await db.execute(select(Task.id)).scalars().all())` |
+
+### O que NÃO pode faltar
+
+1. **Explicação clara** — o usuário precisa entender o problema e a solução sem ler código
+2. **Por que cada arquivo** — justificar individualmente, não apenas listar
+3. **Draft sem alterar** — mostrar o código futuro sem editar arquivos reais
+4. **Riscos reais** — não inventar riscos genéricos; pensar no que pode realmente quebrar
+5. **Fallback real** — se a abordagem A falhar, qual é a abordagem B?
+
+### Exemplo de plano aprovado (L1)
+
+```
+### L1 — `total` do backend: corrigir paginação
+
+**O que deve ser feito:**
+O endpoint GET /api/tasks retorna total: len(tasks), que é o número de tasks na
+página atual (ex: 50). O correto é retornar o total de registros no banco.
+
+**Arquivos utilizados:**
+- backend/app/routers/history.py:29 — contém a função list_tasks que monta a resposta
+- backend/tests/test_narrate_api.py — teste existente que verifica o retorno
+
+**Técnica:**
+select(func.count(Task.id)) do SQLAlchemy para fazer uma segunda query que conta
+o total de linhas no banco, independente do offset/limit.
+
+**Mini draft:**
+total = (await db.execute(select(func.count(Task.id)))).scalar()
+
+**Riscos:**
+| Risco | Impacto | Mitigação |
+|-------|---------|-----------|
+| Query extra | Mínimo | count(*) é O(1) no PostgreSQL |
+
+**Viabilidade:** Alta — mudança localizada de 3 linhas
+
+**Fallback:**
+len(await db.execute(select(Task.id)).scalars().all()) se func.count falhar
+```
+
+---
 
 ---
 

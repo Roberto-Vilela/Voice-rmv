@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { deleteTask } from "../api/client";
 import { useTasks } from "../api/hooks";
+import { getErrorMessage } from "../utils/errors";
 import type { Task } from "../types";
 
 type FilterKey = "all" | "videos" | "transcriptions" | "audio" | "archived";
@@ -59,9 +60,17 @@ export default function VideoUploadPage() {
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterKey>("all");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const scopeRef = useRef<HTMLDivElement>(null);
 
   const cards = useMemo(() => buildCards(tasks), [tasks]);
+
+  useEffect(() => {
+    if (!error) return;
+    const timer = setTimeout(() => setError(null), 6000);
+    return () => clearTimeout(timer);
+  }, [error]);
 
   const filteredCards = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -99,8 +108,16 @@ export default function VideoUploadPage() {
   }, [filteredCards.length, viewMode]);
 
   const handleDelete = async (taskId: string) => {
-    await deleteTask(taskId);
-    await refetch();
+    setDeletingId(taskId);
+    setError(null);
+    try {
+      await deleteTask(taskId);
+      await refetch();
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to delete file."));
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const openTask = (task?: Task) => {
@@ -274,7 +291,7 @@ export default function VideoUploadPage() {
                         </button>
                       )}
                     </div>
-                    <button className="p-2 hover:bg-error-container rounded-lg text-error transition-colors" title="Delete" onClick={() => void handleDelete(task?.id || card.id)}>
+                    <button className="p-2 hover:bg-error-container rounded-lg text-error transition-colors disabled:opacity-40" title="Delete" disabled={deletingId === (task?.id || card.id)} onClick={() => void handleDelete(task?.id || card.id)}>
                       <span className="material-symbols-outlined text-[20px]">delete</span>
                     </button>
                   </div>
@@ -288,6 +305,13 @@ export default function VideoUploadPage() {
       <button className="fixed lg:hidden bottom-24 right-margin-mobile bg-primary text-on-primary w-14 h-14 rounded-2xl shadow-xl flex items-center justify-center hover:scale-110 active:scale-90 transition-all z-40" onClick={() => navigate("/voice-over")}>
         <span className="material-symbols-outlined text-3xl">add</span>
       </button>
+
+      {error && (
+        <div className="toast-slide fixed bottom-28 right-margin-mobile md:right-margin-desktop z-50 bg-error text-white px-4 py-3 rounded-xl shadow-lg max-w-sm flex items-center gap-3">
+          <span className="flex-grow">{error}</span>
+          <button onClick={() => setError(null)} className="shrink-0 w-6 h-6 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors material-symbols-outlined text-[16px]">close</button>
+        </div>
+      )}
     </div>
   );
 }

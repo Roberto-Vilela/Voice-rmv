@@ -398,3 +398,20 @@ podman-compose logs --tail=80 celery_worker
 **Arquivo alterado:** `frontend/src/pages/VoiceOverPage.tsx`
 
 **Testes manuais validados pelo usuário:** ✅
+
+---
+
+### 2026-06-10 — Library Module: L1 (total) + L2 (delete error handling)
+
+**L1 — Backend `total` corrigido:** ✅
+- `history.py:29`: `total=len(tasks)` → `select(func.count(Task.id))` — agora retorna o total real de registros no banco
+- Testes: 30/30 passando
+
+**L2 — Delete com try/catch + toast:** ✅
+- `VideoUploadPage.tsx`: adicionado `error` state, `deletingId` state, `getErrorMessage()`, auto-dismiss toast 6s
+- Botão delete desabilitado (`opacity-40`) durante operação
+- Build: 163 modules, sem erros
+
+**Workflow learning:**
+- Novo formato de plano obrigatório adicionado ao `WORKFLOW_RULES.md` — deve conter: o que fazer, arquivos (com porquê), técnica, mini draft, riscos, viabilidade, fallback
+- Plano detalhado melhora a compreensão do usuário e reduz retrabalho

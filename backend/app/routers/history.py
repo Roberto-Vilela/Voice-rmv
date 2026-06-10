@@ -2,7 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -24,9 +24,11 @@ router = APIRouter(prefix="/api", tags=["history"])
 async def list_tasks(skip: int = 0, limit: int = 50, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Task).order_by(Task.created_at.desc()).offset(skip).limit(limit))
     tasks = result.scalars().all()
+    count_result = await db.execute(select(func.count(Task.id)))
+    total = count_result.scalar()
     return TaskListResponse(
         tasks=[task_to_response(t) for t in tasks],
-        total=len(tasks),
+        total=total,
     )
 
 
