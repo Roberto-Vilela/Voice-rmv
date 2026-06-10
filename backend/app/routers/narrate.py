@@ -13,9 +13,9 @@ from app.models.schemas import (
 )
 from app.models.task import Task
 from app.services.task_response import task_to_response
-from app.services.tts_engine import synthesize
 from app.tasks.narration_tasks import (
     narrate_audio_file_task,
+    narrate_text_task,
     narrate_video_file_task,
     narrate_video_url_task,
 )
@@ -25,29 +25,12 @@ router = APIRouter(prefix="/api/narrate", tags=["narrate"])
 
 @router.post("/text", response_model=TaskResponse)
 async def narrate_text(body: NarrateTextRequest, db: AsyncSession = Depends(get_db)):
-    task = Task(type="text", voice=body.voice, input_text=body.text, status="processing", progress=0)
+    task = Task(type="text", voice=body.voice, input_text=body.text, status="pending", progress=0)
     db.add(task)
     await db.commit()
     await db.refresh(task)
 
-    try:
-        audio_bytes = await synthesize(body.text, body.voice)
-        filename = f"{task.id}.mp3"
-        audio_dir = Path(settings.output_dir) / "narrations"
-        audio_dir.mkdir(parents=True, exist_ok=True)
-        audio_path = audio_dir / filename
-        audio_path.write_bytes(audio_bytes)
-
-        task.status = "completed"
-        task.progress = 100
-        task.audio_path = str(audio_path)
-        await db.commit()
-        await db.refresh(task)
-    except Exception as e:
-        task.status = "error"
-        task.error = str(e)
-        await db.commit()
-        await db.refresh(task)
+    narrate_text_task.delay(body.text, body.voice, str(task.id), body.speed, body.pitch, body.volume)
 
     return task_to_response(task)
 

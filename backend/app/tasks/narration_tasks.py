@@ -4,7 +4,7 @@ from app.config import settings
 from app.database import update_task
 from app.services.audio_processor import convert_to_wav, extract_audio, get_media_duration
 from app.services.transcriber import transcribe
-from app.services.tts_engine import build_narration_segments, synthesize_with_timing
+from app.services.tts_engine import build_narration_segments, synthesize, synthesize_with_timing
 from app.services.video_downloader import download_video
 from app.tasks.celery_app import celery_app
 from app.database import run_async
@@ -36,6 +36,27 @@ def _save_transcription(task_id: str, text: str) -> str:
     path = txt_dir / f"{task_id}.txt"
     path.write_text(text, encoding="utf-8")
     return str(path)
+
+
+@celery_app.task(bind=True)
+def narrate_text_task(self, text: str, voice: str, task_id: str, speed: float = 1.0, pitch: int = 0, volume: float = 1.0):
+    try:
+        update_task(task_id, status="processing", progress=10)
+
+        audio_bytes = run_async(synthesize(text, voice, speed=speed, pitch=pitch, volume=volume))
+        narration_path = _save_narration_audio(task_id, audio_bytes)
+
+        _update_task_extra(task_id, {"input_text": text})
+
+        update_task(
+            task_id,
+            status="completed",
+            progress=100,
+            audio_path=narration_path,
+            transcription=text,
+        )
+    except Exception as e:
+        update_task(task_id, status="error", error=str(e))
 
 
 @celery_app.task(bind=True)

@@ -1,19 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import WaveformPlayer from "../components/WaveformPlayer";
-import { isAxiosError } from "axios";
 import { createUploadTask, createVideoUrlTask } from "../api/tasks";
 import { patchTask } from "../api/client";
 import { useTask, useTasks } from "../api/hooks";
+import { getErrorMessage } from "../utils/errors";
 import type { Task } from "../types";
-
-function getErrorMessage(err: unknown, fallback: string): string {
-  if (isAxiosError(err)) {
-    return err.response?.data?.detail || err.message || fallback;
-  }
-  if (err instanceof Error) return err.message;
-  return fallback;
-}
 
 type EditorSegment = {
   id: string;

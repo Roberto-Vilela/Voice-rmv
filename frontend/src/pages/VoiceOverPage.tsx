@@ -2,6 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { createTextTask } from "../api/tasks";
 import { useTask, useVoices } from "../api/hooks";
+import { getTask } from "../api/client";
+import { getErrorMessage } from "../utils/errors";
+import { useSpeechToText } from "../hooks/useSpeechToText";
 import WaveformPlayer from "../components/WaveformPlayer";
 import type { Task, Voice } from "../types";
 
@@ -10,25 +13,27 @@ type FeaturedVoice = {
   title: string;
   subtitle: string;
   icon: string;
+  locale: string;
 };
 
-function buildFeaturedVoices(voices: Voice[]): FeaturedVoice[] {
-  const lookup = new Map(voices.map((voice) => [voice.name, voice]));
-  const candidates = [
-    { name: "en-US-GuyNeural", title: "Natural Male", subtitle: "Warm & Engaging", icon: "face", fallbackLocale: "en-US" },
-    { name: "en-US-AriaNeural", title: "Soft Female", subtitle: "Calm & Soothing", icon: "face_3", fallbackLocale: "en-US" },
-    { name: "pt-BR-FranciscaNeural", title: "AI Professional", subtitle: "Clear & Direct", icon: "smart_toy", fallbackLocale: "pt-BR" },
-    { name: "pt-BR-AntonioNeural", title: "Storyteller", subtitle: "Deep & Dramatic", icon: "record_voice_over", fallbackLocale: "pt-BR" },
-  ];
+const VOICE_PERSONAS: { name: string; title: string; subtitle: string; icon: string; locale: string }[] = [
+  { name: "en-US-AriaNeural",   title: "Soft Female",      subtitle: "Calm & Soothing",            icon: "face_3",           locale: "en-US" },
+  { name: "en-US-GuyNeural",    title: "Natural Male",     subtitle: "Warm & Engaging",            icon: "face",             locale: "en-US" },
+  { name: "pt-BR-FranciscaNeural", title: "Executiva",     subtitle: "Clara & Profissional",       icon: "business_center",  locale: "pt-BR" },
+  { name: "pt-BR-AntonioNeural",   title: "Narrador",      subtitle: "Profundo & Dramático",       icon: "record_voice_over", locale: "pt-BR" },
+  { name: "en-US-JennyNeural",     title: "Executive",     subtitle: "Professional & Confident",   icon: "business_center",  locale: "en-US" },
+  { name: "en-US-ChristopherNeural", title: "Business",    subtitle: "Formal & Polished",          icon: "work",             locale: "en-US" },
+  { name: "en-US-AndrewNeural",     title: "Lecture",      subtitle: "Authoritative & Clear",      icon: "school",           locale: "en-US" },
+  { name: "en-US-MichelleNeural",   title: "Creative",     subtitle: "Expressive & Vibrant",       icon: "brush",            locale: "en-US" },
+  { name: "en-US-RogerNeural",      title: "Motivational", subtitle: "Energetic & Inspiring",      icon: "trending_up",      locale: "en-US" },
+  { name: "en-US-AnaNeural",        title: "Friendly",     subtitle: "Warm & Approachable",        icon: "favorite",         locale: "en-US" },
+];
 
-  return candidates.map((candidate) => {
-    const voice = lookup.get(candidate.name) || voices.find((item) => item.locale?.startsWith(candidate.fallbackLocale)) || null;
-    return {
-      name: voice?.name || candidate.name,
-      title: candidate.title,
-      subtitle: candidate.subtitle,
-      icon: candidate.icon,
-    };
+function buildVoices(voices: Voice[]): FeaturedVoice[] {
+  const lookup = new Map(voices.map((voice) => [voice.name, voice]));
+  return VOICE_PERSONAS.map((c) => {
+    const voice = lookup.get(c.name) || voices.find((item) => item.locale?.startsWith(c.locale)) || null;
+    return { name: voice?.name || c.name, title: c.title, subtitle: c.subtitle, icon: c.icon, locale: c.locale };
   });
 }
 
@@ -38,19 +43,29 @@ export default function VoiceOverPage() {
   const taskId = searchParams.get("taskId");
   const textParam = searchParams.get("text") || "";
   const { data: voices = [], isLoading: voicesLoading } = useVoices();
-  const { data: loadedTask } = useTask(taskId);
+  const { data: loadedTask, isError: taskError } = useTask(taskId);
 
   const [script, setScript] = useState(textParam);
   const [selectedVoice, setSelectedVoice] = useState("en-US-AriaNeural");
   const [speed, setSpeed] = useState(1.0);
   const [pitch, setPitch] = useState(0);
-  const [advanced, setAdvanced] = useState(false);
+  const [volume, setVolume] = useState(1.0);
+  const [showAllVoices, setShowAllVoices] = useState(false);
+  const [langFilter, setLangFilter] = useState<"all" | "pt-BR" | "en-US">("pt-BR");
   const [generatedTask, setGeneratedTask] = useState<Task | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const revealScopeRef = useRef<HTMLDivElement>(null);
 
-  const featuredVoices = useMemo(() => buildFeaturedVoices(voices), [voices]);
+  useEffect(() => {
+    if (!error) return;
+    const timer = setTimeout(() => setError(null), 6000);
+    return () => clearTimeout(timer);
+  }, [error]);
+
+  const personaVoices = useMemo(() => buildVoices(voices), [voices]);
+  const featuredVoices = useMemo(() => personaVoices.slice(0, 4), [personaVoices]);
+  const { isListening, transcript, start, stop, isSupported } = useSpeechToText();
 
   useEffect(() => {
     if (!loadedTask) return;
@@ -59,6 +74,12 @@ export default function VoiceOverPage() {
     setGeneratedTask(loadedTask.audio_url ? loadedTask : null);
     setError(null);
   }, [loadedTask?.id, textParam]);
+
+  useEffect(() => {
+    if (transcript) {
+      setScript((prev) => prev + (prev ? " " : "") + transcript);
+    }
+  }, [transcript]);
 
   useEffect(() => {
     const root = revealScopeRef.current;
@@ -79,7 +100,7 @@ export default function VoiceOverPage() {
 
     cards.forEach((card) => observer.observe(card));
     return () => observer.disconnect();
-  }, [generatedTask?.id, script, selectedVoice]);
+  }, [generatedTask?.id]);
 
   const characterCount = script.length;
   const previewTask = generatedTask || (loadedTask?.audio_url ? loadedTask : null);
@@ -107,11 +128,24 @@ export default function VoiceOverPage() {
     setIsGenerating(true);
     setError(null);
     try {
-      const task = await createTextTask(script, selectedVoice);
+      const task = await createTextTask(script, selectedVoice, speed, pitch, volume);
       setGeneratedTask(task);
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || err?.message || "Unable to generate audio.");
-    } finally {
+
+      const poll = setInterval(async () => {
+        try {
+          const updated = await getTask(task.id);
+          if (updated.status === "completed" || updated.status === "error") {
+            clearInterval(poll);
+            setGeneratedTask(updated);
+            setIsGenerating(false);
+          }
+        } catch {
+          clearInterval(poll);
+          setIsGenerating(false);
+        }
+      }, 1000);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Unable to generate audio."));
       setIsGenerating(false);
     }
   };
@@ -135,12 +169,22 @@ export default function VoiceOverPage() {
               placeholder="Start typing your story or paste a professional script here..."
               value={script}
               onChange={(e) => setScript(e.target.value)}
+              maxLength={5000}
             />
             <div className="flex justify-between items-center mt-4 pt-4 border-t border-outline-variant">
               <span className={`text-body-sm font-body-sm ${characterCount > 5000 ? "text-error" : "text-outline"}`}>
                 {characterCount.toLocaleString()} / 5,000 characters
               </span>
               <div className="flex gap-2">
+                {isSupported && (
+                  <button
+                    className={`p-2 rounded-lg transition-colors material-symbols-outlined ${isListening ? "bg-error/20 text-error animate-pulse" : "hover:bg-surface-container text-on-surface-variant"}`}
+                    onClick={() => (isListening ? stop() : start())}
+                    title={isListening ? "Stop recording" : "Speak to write"}
+                  >
+                    mic
+                  </button>
+                )}
                 <button className="p-2 hover:bg-surface-container rounded-lg transition-colors material-symbols-outlined text-on-surface-variant" onClick={autoFixScript} title="Auto fix">
                   auto_fix_high
                 </button>
@@ -154,30 +198,43 @@ export default function VoiceOverPage() {
           <section data-reveal className="reveal-card hover-lift">
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-headline-md text-headline-md">Select Voice Model</h3>
-              <button className="text-primary font-label-md text-label-md hover:underline">View All</button>
+              <button className="text-primary font-label-md text-label-md hover:underline" onClick={() => setShowAllVoices((v) => !v)}>{showAllVoices ? "Show Less" : "View All"}</button>
             </div>
             {voicesLoading ? (
               <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 text-on-surface-variant">Loading voices…</div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                {featuredVoices.map((voice) => {
-                  const active = selectedVoice === voice.name;
-                  return (
+              <>
+                <div className="flex gap-2 mb-4">
+                  {(["all", "pt-BR", "en-US"] as const).map((lang) => (
                     <button
-                      key={voice.name}
-                      type="button"
-                      onClick={() => setSelectedVoice(voice.name)}
-                      className={`text-left bg-surface-container-lowest rounded-xl p-4 cursor-pointer transition-all active:scale-95 group border shadow-sm hover:border-primary ${active ? "border-primary active-voice-card" : "border-outline-variant"}`}
+                      key={lang}
+                      onClick={() => setLangFilter(lang)}
+                      className={`filter-pill px-4 py-1.5 rounded-full text-label-md ${langFilter === lang ? "bg-primary text-on-primary" : "bg-outline-variant text-on-surface hover:bg-primary/20"}`}
                     >
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-3 ${active ? "bg-primary-container text-on-primary" : "bg-surface-container-highest text-secondary"}`}>
-                        <span className="material-symbols-outlined">{voice.icon}</span>
-                      </div>
-                      <p className="font-label-md text-label-md text-on-surface">{voice.title}</p>
-                      <p className="text-body-sm font-body-sm text-on-surface-variant">{voice.subtitle}</p>
+                      {lang === "all" ? "All" : lang === "pt-BR" ? "🇧🇷 Português" : "🇺🇸 English"}
                     </button>
-                  );
-                })}
-              </div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  {(showAllVoices ? personaVoices : featuredVoices).filter((v) => langFilter === "all" || v.locale === langFilter).map((voice) => {
+                    const active = selectedVoice === voice.name;
+                    return (
+                      <button
+                        key={voice.name}
+                        type="button"
+                        onClick={() => setSelectedVoice(voice.name)}
+                        className={`card-hover text-left bg-surface-container-lowest rounded-xl p-4 cursor-pointer group border shadow-sm hover:border-primary ${active ? "border-primary active-voice-card" : "border-outline-variant"}`}
+                      >
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-3 transition-colors duration-220 ${active ? "bg-primary-container text-on-primary" : "bg-surface-container-highest text-secondary group-hover:bg-primary-fixed group-hover:text-primary"}`}>
+                          <span className="material-symbols-outlined">{voice.icon}</span>
+                        </div>
+                        <p className="font-label-md text-label-md text-on-surface">{voice.title}</p>
+                        <p className="text-body-sm font-body-sm text-on-surface-variant">{voice.subtitle}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
             )}
           </section>
         </div>
@@ -210,26 +267,41 @@ export default function VoiceOverPage() {
                 </div>
               </div>
 
-              <button className="flex items-center gap-2 text-primary font-label-md text-label-md py-2 hover:bg-primary/5 rounded-lg w-full transition-colors" onClick={() => setAdvanced((current) => !current)}>
-                <span className="material-symbols-outlined text-[20px]">settings_input_component</span>
-                {advanced ? "Hide Advanced" : "Advanced Modulation"}
-              </button>
-
-              {advanced && (
-                <div className="text-body-sm text-on-surface-variant bg-surface-container rounded-xl p-4">
-                  Advanced modulation is ready for future TTS controls.
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <label className="font-label-md text-label-md text-on-surface">Volume</label>
+                  <span className="text-primary font-bold">{volume.toFixed(1)}x</span>
                 </div>
-              )}
+                <input className="w-full h-2 bg-outline-variant rounded-lg appearance-none cursor-pointer accent-primary" max="2.0" min="0.0" step="0.1" type="range" value={volume} onChange={(e) => setVolume(Number(e.target.value))} />
+                <div className="flex justify-between text-body-sm text-outline">
+                  <span>Mute</span>
+                  <span>Amplify</span>
+                </div>
+              </div>
+
             </div>
           </section>
 
-          <section data-reveal className="reveal-card hover-lift bg-surface-container-highest rounded-xl p-6 border border-primary/20 relative overflow-hidden group" id="preview-section">
+          <section data-reveal className="reveal-card bg-surface-container-highest rounded-xl p-6 border border-primary/20 relative overflow-hidden group" id="preview-section">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-label-md text-label-md text-on-surface">Real-time Preview</h3>
-              <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+              {isGenerating ? (
+                <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+              ) : previewTask?.audio_url ? (
+                <span className="w-2 h-2 rounded-full bg-primary" />
+              ) : null}
             </div>
-            <WaveformPlayer task={previewTask} />
-            {previewTask && (
+            {taskId && taskError ? (
+              <p className="text-body-sm text-error text-center py-6">Task not found.</p>
+            ) : isGenerating ? (
+              <div className="flex flex-col items-center justify-center py-8 gap-3">
+                <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                <p className="text-body-sm text-on-surface-variant">Generating audio…</p>
+              </div>
+            ) : (
+              <WaveformPlayer task={previewTask} />
+            )}
+            {previewTask?.audio_url && (
               <button className="mt-4 text-primary text-label-md hover:underline" onClick={() => navigate(`/editor?taskId=${previewTask.id}`)}>
                 Open in Editor
               </button>
@@ -238,11 +310,11 @@ export default function VoiceOverPage() {
 
           <button
             data-reveal
-            className="reveal-card hover-lift w-full bg-primary hover:bg-on-primary-fixed-variant text-on-primary font-headline-md py-4 rounded-xl shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-3 group disabled:opacity-60 disabled:cursor-not-allowed"
+            className="btn-glow reveal-card hover-lift w-full bg-primary hover:bg-on-primary-fixed-variant text-on-primary font-headline-md py-4 rounded-xl shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-3 group disabled:opacity-60 disabled:cursor-not-allowed"
             onClick={() => void generateAudio()}
             disabled={isGenerating || !script.trim()}
           >
-            <span className="material-symbols-outlined group-hover:rotate-12 transition-transform" style={{ fontVariationSettings: "'FILL' 1" }}>
+            <span className="material-symbols-outlined icon-filled group-hover:rotate-12 transition-transform">
               record_voice_over
             </span>
             {isGenerating ? "Generating..." : "Generate & Record"}
@@ -251,8 +323,9 @@ export default function VoiceOverPage() {
       </main>
 
       {error && (
-        <div className="fixed bottom-28 right-margin-mobile md:right-margin-desktop z-50 bg-error text-white px-4 py-3 rounded-xl shadow-lg max-w-sm">
-          {error}
+        <div className="toast-slide fixed bottom-28 right-margin-mobile md:right-margin-desktop z-50 bg-error text-white px-4 py-3 rounded-xl shadow-lg max-w-sm flex items-center gap-3">
+          <span className="flex-grow">{error}</span>
+          <button onClick={() => setError(null)} className="shrink-0 w-6 h-6 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors material-symbols-outlined text-[16px]">close</button>
         </div>
       )}
     </div>

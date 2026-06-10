@@ -4,8 +4,8 @@ const api = axios.create({
   baseURL: "/api",
 });
 
-export async function narrateText(text: string, voice: string) {
-  const { data } = await api.post("/narrate/text", { text, voice });
+export async function narrateText(text: string, voice: string, speed = 1.0, pitch = 0, volume = 1.0) {
+  const { data } = await api.post("/narrate/text", { text, voice, speed, pitch, volume });
   return data;
 }
 

@@ -1,12 +1,15 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class NarrateTextRequest(BaseModel):
-    text: str
+    text: str = Field(..., max_length=5000)
     voice: str = "en-US-AriaNeural"
+    speed: float = 1.0
+    pitch: int = 0
+    volume: float = 1.0
 
 
 class NarrateVideoUrlRequest(BaseModel):

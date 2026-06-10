@@ -14,8 +14,25 @@ def _word_count(text: str) -> int:
     return len(re.findall(r"\w+", text, flags=re.UNICODE))
 
 
-async def synthesize(text: str, voice: str = "en-US-AriaNeural") -> bytes:
-    communicate = edge_tts.Communicate(text, voice)
+def _rate_from_speed(speed: float) -> str:
+    pct = (speed - 1.0) * 100
+    return f"{pct:+.0f}%"
+
+
+def _pitch_str(pitch: int) -> str:
+    return f"{pitch:+d}Hz"
+
+
+def _volume_str(volume: float) -> str:
+    pct = (volume - 1.0) * 100
+    return f"{pct:+.0f}%"
+
+
+async def synthesize(text: str, voice: str = "en-US-AriaNeural", speed: float | None = None, pitch: int | None = None, volume: float | None = None) -> bytes:
+    rate = _rate_from_speed(speed) if speed is not None else "+0%"
+    pitch_str = _pitch_str(pitch) if pitch is not None else "+0Hz"
+    vol_str = _volume_str(volume) if volume is not None else "+0%"
+    communicate = edge_tts.Communicate(text, voice, rate=rate, pitch=pitch_str, volume=vol_str)
     audio = b""
     stream = communicate.stream()
     if inspect.isawaitable(stream):

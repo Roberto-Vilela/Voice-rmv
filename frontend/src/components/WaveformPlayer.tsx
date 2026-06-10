@@ -46,7 +46,7 @@ export default function WaveformPlayer({ task, onTimeUpdate }: Props) {
       container.appendChild(bar);
       barsRef.current.push(bar);
     }
-  }, [task?.id]);
+  }, [task?.id, task?.audio_url]);
 
   useEffect(() => {
     if (wrapperRef.current) {
