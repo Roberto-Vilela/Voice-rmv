@@ -4,6 +4,11 @@ description: Regras oficiais de workflow do assistente - Atualizadas com valida�
 type: feedback
 ---
 
+# Arquivo Historico
+
+Esta continuacao preserva regras, templates e anexos anteriores ate 2026-06-10.
+Para regras vigentes, consultar `workflow_rules.md`.
+
 # Voice-RMV — Workflow Oficial de Execução
 
 **Status:** ✅ Validado e Documentado  

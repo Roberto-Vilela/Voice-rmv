@@ -47,6 +47,43 @@ export async function patchTask(taskId: string, body: { display_name?: string; t
   return data;
 }
 
+export type TranslationSegment = {
+  id: string;
+  text: string;
+};
+
+export type TranslationResponse = {
+  segments: TranslationSegment[];
+  translated_text: string;
+};
+
+export async function translateText(
+  segments: TranslationSegment[],
+  sourceLang = "auto",
+  targetLang = "pt-BR",
+): Promise<TranslationResponse> {
+  const { data } = await api.post<TranslationResponse>("/translate", {
+    segments,
+    source_lang: sourceLang,
+    target_lang: targetLang,
+  });
+  return data;
+}
+
+export async function translateTaskText(
+  taskId: string,
+  segments: TranslationSegment[],
+  sourceLang = "auto",
+  targetLang = "pt-BR",
+): Promise<TranslationResponse> {
+  const { data } = await api.post<TranslationResponse>(`/translate-task/${taskId}`, {
+    segments,
+    source_lang: sourceLang,
+    target_lang: targetLang,
+  });
+  return data;
+}
+
 export async function getVoices() {
   const { data } = await api.get("/voices");
   return data;

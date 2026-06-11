@@ -80,28 +80,29 @@ Project knowledge base. Always consult before starting work.
 
 | File | Content |
 |------|---------|
-| `MEMORY.md` | **Start here** — index, quick facts, architecture |
-| `progress.md` | What works, recent changes, known issues |
-| `techContext.md` | Stack versions, constraints, dependencies |
-| `DESIGNER_RULES.md` | Color palette, typography, UI patterns |
+| `Workflow.md` | **Start here** — official execution sequence and reference index |
+| `workflow_rules.md` | Normative rules, mandatory plan format, approval and validation gates |
+| `designer_rules.md` | Current visual rules, tokens and UI patterns |
+| `progress.md` | Current state and index of validated project history |
 | `REPORTO_BACKEND_ANALISE_INDEX.md` | Backend API endpoints, services, tests |
 | `FRONTEND_ANALYSIS_INDEX.md` | Frontend pages, components, routes, hooks |
-| `EXECUTION_WORKFLOW.md` | Full workflow with examples (890 lines) |
-| `WORKFLOW_RULES.md` | Official workflow rules (normative source) |
+| `techContext.md` | Stack versions, constraints, dependencies |
+
+Large documents use numbered continuations such as `progress_01.md`. Read a
+continuation only when its main file points to it for the current task.
 
 ## Workflow (rules + execution)
 
 Follow these 14 steps in order on every task. The workflow is defined in
-`WORKFLOW_RULES.md` (normative rules) and detailed in `EXECUTION_WORKFLOW.md`
-(with examples). References below use the step numbers from those files.
+`workflow_rules.md` (normative rules) and `Workflow.md` (execution sequence).
 
 ### Phase 1 — Analysis & planning (steps 1-6)
 
 1. **Entender input** — read request carefully, identify context/objective
 2. **Analisar código** — read relevant files, directory structure, existing patterns
 3. **Ver viabilidade** — assess complexity, constraints, dependencies
-4. **Consultar memory bank** — start with `MEMORY.md`, then analysis/design/progress files as needed
-5. **Montar plano** — detailed task list with effort estimate, risks, known issues
+4. **Consultar memory bank** — read `Workflow.md`, `workflow_rules.md`, `progress.md`, then only relevant references
+5. **Montar plano** — include every mandatory field defined in `workflow_rules.md`
 6. **Plano aprovado** — present plan to user and wait for explicit confirmation (`"OK"` or `"SIM"`) before proceeding
 
 ### Phase 2 — Execution (step 7)
@@ -119,15 +120,15 @@ Follow these 14 steps in order on every task. The workflow is defined in
 9. **Resumir com detalhes** — explain what was done, decisions, learnings
 10. **Concluir** — list modified/created files, confirm scope delivered
 11. **Refinar** — polish code, remove console.log, optimize Tailwind classes
-12. **Feedback para memory** — save learnings in memory-bank, update `progress.md`
-13. **Atualizar workflow** — update `EXECUTION_WORKFLOW.md` with new patterns/learnings
-14. **Atualizar índice principal** — review `MEMORY.md`, `progress.md`
+12. **Feedback para memory** — record validated work in `progress.md`
+13. **Atualizar workflow** — update workflow files only when the process actually changes
+14. **Atualizar índices** — review main files and numbered continuations
 
 ### Golden rules
 
 - ✅ Always list tests for human validation after implementation (step 8)
 - ✅ Wait for explicit user confirmation before proceeding
-- ✅ Document all learnings back to memory-bank
+- ✅ Preserve history through numbered continuation files
 - ❌ **Never** run automated tests automatically (only if user asks)
 - ❌ **Never** continue past step 8 without human validation
 - ❌ **Never** assume it works — human feedback is critical

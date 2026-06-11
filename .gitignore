@@ -35,6 +35,16 @@ credentials/
 
 # Notas pessoais do desenvolvedor / agentes (NÃO SUBIR)
 memory-bank/
+!/.qwen/memory-bank/
+/.qwen/memory-bank/*
+!/.qwen/memory-bank/Workflow.md
+!/.qwen/memory-bank/Workflow_[0-9][0-9].md
+!/.qwen/memory-bank/workflow_rules.md
+!/.qwen/memory-bank/workflow_rules_[0-9][0-9].md
+!/.qwen/memory-bank/designer_rules.md
+!/.qwen/memory-bank/designer_rules_[0-9][0-9].md
+!/.qwen/memory-bank/progress.md
+!/.qwen/memory-bank/progress_[0-9][0-9].md
 .clinerules/
 .opencode/
 opencode/

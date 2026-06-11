@@ -41,6 +41,22 @@ class TaskListResponse(BaseModel):
     total: int
 
 
+class TranslationSegment(BaseModel):
+    id: str = Field(..., min_length=1, max_length=128)
+    text: str = Field(..., min_length=1, max_length=100000)
+
+
+class TranslateRequest(BaseModel):
+    segments: list[TranslationSegment] = Field(..., min_length=1, max_length=5000)
+    source_lang: str = Field(default="auto", max_length=32)
+    target_lang: str = "pt-BR"
+
+
+class TranslateResponse(BaseModel):
+    segments: list[TranslationSegment]
+    translated_text: str
+
+
 class VoiceResponse(BaseModel):
     name: str
     locale: str

@@ -5,8 +5,9 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.main import app
-from app.routers.narrate import get_db as narrate_get_db
 from app.routers.history import get_db as history_get_db
+from app.routers.narrate import get_db as narrate_get_db
+from app.routers.translate import get_db as translate_get_db
 
 
 @pytest.fixture
@@ -93,6 +94,7 @@ def override_get_db(mock_db_session):
 
     app.dependency_overrides[narrate_get_db] = _get_db
     app.dependency_overrides[history_get_db] = _get_db
+    app.dependency_overrides[translate_get_db] = _get_db
     yield
     app.dependency_overrides.clear()
 

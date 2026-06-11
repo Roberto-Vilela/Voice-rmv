@@ -56,7 +56,7 @@ function buildCards(tasks: Task[]): FileCard[] {
 
 export default function VideoUploadPage() {
   const navigate = useNavigate();
-  const { data: tasks = [], refetch } = useTasks();
+  const { data: tasks = [], isLoading, refetch } = useTasks();
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterKey>("all");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
@@ -108,6 +108,7 @@ export default function VideoUploadPage() {
   }, [filteredCards.length, viewMode]);
 
   const handleDelete = async (taskId: string) => {
+    if (!confirm("Are you sure you want to delete this file? This action cannot be undone.")) return;
     setDeletingId(taskId);
     setError(null);
     try {
@@ -167,11 +168,7 @@ export default function VideoUploadPage() {
               <span className="material-symbols-outlined text-[20px]">format_list_bulleted</span>
             </button>
           </div>
-          <div className="w-px h-8 bg-outline-variant mx-2 hidden sm:block" />
-          <button className="hidden sm:flex items-center gap-2 px-4 py-2 border border-outline-variant rounded-xl text-on-surface-variant hover:bg-surface-container-low transition-all">
-            <span className="material-symbols-outlined text-[20px]">filter_list</span>
-            <span className="font-label-md hidden sm:block">Filter</span>
-          </button>
+
         </div>
       </div>
 
@@ -195,7 +192,19 @@ export default function VideoUploadPage() {
         <button className={tabButtonClass("archived")} onClick={() => setActiveFilter("archived")}>Archived</button>
       </div>
 
-      {filteredCards.length === 0 ? (
+      {isLoading ? (
+        <div className={`grid gap-gutter ${viewMode === "grid" ? "grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5" : "grid-cols-1"}`}>
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden animate-pulse">
+              <div className="aspect-video bg-outline-variant" />
+              <div className="p-4 space-y-3">
+                <div className="h-4 w-3/4 bg-outline-variant rounded" />
+                <div className="h-3 w-1/2 bg-outline-variant rounded" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : filteredCards.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-32 text-center">
           <div className="w-64 h-64 mb-8 bg-surface-container rounded-full flex items-center justify-center relative">
             <span className="material-symbols-outlined text-[120px] text-outline-variant">folder_off</span>
@@ -274,15 +283,15 @@ export default function VideoUploadPage() {
                   </div>
                   <div className="flex items-center gap-2 text-body-sm text-on-surface-variant mb-4 flex-wrap">
                     <span>{card.subtitle}</span>
-                    <span className="w-1 h-1 rounded-full bg-outline-variant" />
-                    <span>{task?.progress ?? 0}%</span>
+                    {task?.status !== "pending" && (<><span className="w-1 h-1 rounded-full bg-outline-variant" />
+                    <span>{task?.progress ?? 0}%</span></>)}
                   </div>
                   <div className="flex justify-between items-center border-t border-outline-variant pt-3 mt-auto">
                     <div className="flex gap-0.5">
                       <button className="p-2 hover:bg-primary-fixed rounded-lg text-primary transition-colors" title="Edit" onClick={() => openTask(task)}>
                         <span className="material-symbols-outlined text-[20px]">{card.kind === "Transcription" ? "visibility" : "edit"}</span>
                       </button>
-                      <button className="p-2 hover:bg-primary-fixed rounded-lg text-primary transition-colors" title="Share" onClick={async () => navigator.clipboard.writeText(task?.audio_url || task?.input_url || card.title)}>
+                      <button className="p-2 hover:bg-primary-fixed rounded-lg text-primary transition-colors" title="Share" onClick={async () => { const url = task?.audio_url; const shareUrl = url?.startsWith("/") ? window.location.origin + url : (url || task?.input_url || card.title); await navigator.clipboard.writeText(shareUrl); }}>
                         <span className="material-symbols-outlined text-[20px]">share</span>
                       </button>
                       {task?.audio_url && (

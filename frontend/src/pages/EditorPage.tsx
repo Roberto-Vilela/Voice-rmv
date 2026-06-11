@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import WaveformPlayer from "../components/WaveformPlayer";
 import { createUploadTask, createVideoUrlTask } from "../api/tasks";
-import { patchTask } from "../api/client";
+import { patchTask, translateTaskText, translateText } from "../api/client";
 import { useTask, useTasks } from "../api/hooks";
 import { getErrorMessage } from "../utils/errors";
 import type { Task } from "../types";
@@ -162,6 +162,9 @@ export default function EditorPage() {
   const [isDirty, setIsDirty] = useState(false);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isTranslationMode, setIsTranslationMode] = useState(false);
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [translationSegments, setTranslationSegments] = useState<EditorSegment[]>([]);
 
   const { data: currentTaskData } = useTask(taskId);
   const { data: tasks = [] } = useTasks();
@@ -194,6 +197,8 @@ export default function EditorPage() {
     setSavedAt(null);
     setError(null);
     setCurrentTime(0);
+    setIsTranslationMode(false);
+    setTranslationSegments([]);
   }, [sourceKey]);
 
   useEffect(() => {
@@ -289,11 +294,15 @@ export default function EditorPage() {
     }
 
     const transcription = segments.map((segment) => stripHtml(segment.html).trim()).filter(Boolean).join("\n\n");
-    const extraData = {
+    const extraData: Record<string, unknown> = {
       ...(currentTask.extra_data || {}),
       editor_segments: segments,
       editor_saved_at: new Date().toISOString(),
     };
+    if (isTranslationMode && translationSegments.length > 0) {
+      extraData.translation_segments = translationSegments.map((s) => ({ id: s.id, html: s.html }));
+      extraData.translated_text = translationSegments.map((s) => stripHtml(s.html).trim()).filter(Boolean).join("\n\n");
+    }
 
     setIsSaving(true);
     setError(null);
@@ -325,6 +334,73 @@ export default function EditorPage() {
     URL.revokeObjectURL(url);
   };
 
+  const handleTranslate = useCallback(async () => {
+    if (!segments.length) {
+      setError("No transcription segments available. Wait for transcription to complete.");
+      return;
+    }
+    setIsTranslating(true);
+    setError(null);
+    try {
+      const sourceLanguage =
+        typeof currentTask?.extra_data?.language === "string"
+          ? currentTask.extra_data.language
+          : "auto";
+      const sourceSegments = segments.map((segment) => ({
+        id: segment.id,
+        text: stripHtml(segment.html).trim(),
+      })).filter((segment) => segment.text);
+      if (!sourceSegments.length) {
+        setError("No translatable text found in the editor.");
+        return;
+      }
+      const result = currentTask?.id
+        ? await translateTaskText(currentTask.id, sourceSegments, sourceLanguage, "pt-BR")
+        : await translateText(sourceSegments, sourceLanguage, "pt-BR");
+      const translatedById = new Map(
+        result.segments.map((segment) => [segment.id, segment.text]),
+      );
+      const newSegments = segments.map((seg) => ({
+        ...seg,
+        html: textToHtml(translatedById.get(seg.id)?.trim() || ""),
+      }));
+      setTranslationSegments(newSegments);
+      setIsTranslationMode(true);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Translation failed."));
+    } finally {
+      setIsTranslating(false);
+    }
+  }, [segments, currentTask]);
+
+  const handleTranslateExit = useCallback(() => {
+    setIsTranslationMode(false);
+    setTranslationSegments([]);
+  }, []);
+
+  const handleRemoveUpload = async () => {
+    if (!currentTask?.id) return;
+    setIsDirty(false);
+    setIsSaving(true);
+    try {
+      await patchTask(currentTask.id, {
+        transcription: "",
+        extra_data: {
+          display_name: "",
+          narration_segments: [],
+          editor_segments: [],
+          audio_url: "",
+        },
+      });
+      setSegments([]);
+      setCurrentTime(0);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to remove upload."));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleUpload = async (file: File) => {
     try {
       const task = await createUploadTask(file, currentVoice);
@@ -347,94 +423,100 @@ export default function EditorPage() {
 
   return (
     <div ref={revealScopeRef} className="space-y-stack-lg pb-24 md:pb-12">
-      <div className="flex items-center justify-between px-margin-mobile md:px-0">
-        <div className="flex items-center gap-4">
+       <div className="flex items-center justify-between px-margin-mobile md:px-0">
+         <div className="flex items-center gap-4">
+           <button
+             className="active:scale-95 transition-transform hover:opacity-80 p-2 text-on-surface"
+             onClick={() => navigate(-1)}
+           >
+             <span className="material-symbols-outlined">arrow_back</span>
+           </button>
+           <h1 className="text-headline-md font-bold text-primary">Transcription Editor</h1>
+         </div>
+         <div className="flex items-center gap-3">
           <button
-            className="active:scale-95 transition-transform hover:opacity-80 p-2 text-on-surface"
-            onClick={() => navigate(-1)}
+            onClick={handleRemoveUpload}
+            className="hidden md:flex items-center gap-2 px-4 py-2 text-on-surface font-label-md hover:bg-secondary-container/20 rounded-xl transition-all"
+            disabled={!currentTask?.input_file && !currentTask?.input_url}
+            title="Remove current upload"
           >
-            <span className="material-symbols-outlined">arrow_back</span>
+            <span className="material-symbols-outlined">delete</span>
+            <span>Remove source</span>
           </button>
-          <h1 className="text-headline-md font-bold text-primary">Transcription Editor</h1>
+          <button
+            onClick={exportSrt}
+            className="hidden md:flex items-center gap-2 px-4 py-2 text-secondary font-label-md hover:bg-secondary-container/20 rounded-xl transition-all"
+          >
+            <span className="material-symbols-outlined">file_download</span>
+            Export
+          </button>
         </div>
-        <button
-          onClick={exportSrt}
-          className="hidden md:flex items-center gap-2 px-4 py-2 text-secondary font-label-md hover:bg-secondary-container/20 rounded-xl transition-all"
-        >
-          <span className="material-symbols-outlined">file_download</span>
-          Export
-        </button>
-      </div>
+       </div>
 
-      <main className="max-w-container-max mx-auto lg:flex lg:flex-row lg:gap-gutter lg:p-gutter lg:h-[calc(100vh-128px)]">
-        <aside className="lg:w-[400px] lg:flex-shrink-0">
-          <section className="sticky top-16 lg:static z-30 py-stack-md lg:p-0 bg-background/95 backdrop-blur-md lg:bg-transparent">
-            <div className="space-y-gutter">
-              <WaveformPlayer task={currentTask} onTimeUpdate={setCurrentTime} />
-
-              <div data-reveal className="reveal-card hover-lift bg-surface border border-outline-variant rounded-xl shadow-sm overflow-hidden flex flex-col p-4 gap-4">
-                <div className="w-full flex items-center justify-between border-b border-outline-variant pb-3">
-                  <div>
-                    <h3 className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Source</h3>
-                    <p className="text-label-md text-on-surface mt-1">Load video or YouTube link</p>
-                  </div>
-                  <span className="material-symbols-outlined text-secondary">video_library</span>
-                </div>
-                <input
-                  ref={uploadInputRef}
-                  type="file"
-                  accept="video/*,audio/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      void handleUpload(file);
-                    }
-                    e.target.value = "";
-                  }}
-                />
-                <div className="grid gap-2">
+      <div className="max-w-container-max mx-auto lg:p-gutter flex flex-col h-[calc(100vh-128px)] min-h-screen">
+        <div className="px-margin-mobile md:px-0 flex flex-col gap-gutter mb-gutter">
+          <div data-reveal className="reveal-card bg-surface border border-outline-variant rounded-xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden">
+            <div className="p-4 space-y-3">
+              <div className="flex items-center gap-3 border-b border-outline-variant/50 pb-3">
+                <span className="material-symbols-outlined text-secondary text-xl">video_library</span>
+                <h3 className="text-sm font-semibold text-on-surface tracking-wide">Source</h3>
+                <span className={`ml-auto text-[11px] font-medium px-2.5 py-0.5 rounded-full ${
+                  currentTask?.status === "completed"
+                    ? "bg-success/10 text-success"
+                    : currentTask?.status === "processing" || currentTask?.status === "pending"
+                    ? "bg-processing/10 text-processing"
+                    : "bg-surface-container text-on-surface-variant"
+                }`}>
+                  {currentTask?.status === "completed" ? "Ready" : currentTask?.status || "Idle"}
+                </span>
+              </div>
+              <input
+                ref={uploadInputRef}
+                type="file"
+                accept="video/*,audio/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    void handleUpload(file);
+                  }
+                  e.target.value = "";
+                }}
+              />
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  className="flex items-center justify-center gap-2 h-11 px-6 rounded-lg font-semibold bg-primary text-on-primary hover:opacity-90 transition-all active:scale-95 shrink-0"
+                  onClick={() => uploadInputRef.current?.click()}
+                >
+                  <span className="material-symbols-outlined text-lg">upload_file</span>
+                  <span className="text-sm">Load video</span>
+                </button>
+                <div className="flex gap-2 flex-1">
+                  <input
+                    value={youtubeUrl}
+                    onChange={(e) => setYoutubeUrl(e.target.value)}
+                    className="flex-1 h-11 px-4 rounded-lg border border-outline bg-surface-container-low text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                    placeholder="YouTube link"
+                  />
                   <button
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-primary text-on-primary hover:opacity-90 transition-all"
-                    onClick={() => uploadInputRef.current?.click()}
+                    className="h-11 px-6 rounded-lg font-semibold bg-secondary text-white hover:opacity-90 transition-all active:scale-95"
+                    onClick={() => void handleYoutubeLoad()}
                   >
-                    <span className="material-symbols-outlined">upload_file</span>
-                    Load video
+                    Load
                   </button>
-                  <div className="flex gap-2">
-                    <input
-                      value={youtubeUrl}
-                      onChange={(e) => setYoutubeUrl(e.target.value)}
-                      className="flex-1 px-3 py-3 rounded-xl border border-outline-variant bg-surface-container-low text-body-sm outline-none focus:ring-2 focus:ring-primary/20"
-                      placeholder="Inserir link do YouTube"
-                    />
-                    <button
-                      className="px-4 py-3 rounded-xl bg-secondary text-white hover:opacity-90 transition-all"
-                      onClick={() => void handleYoutubeLoad()}
-                    >
-                      Load URL
-                    </button>
-                  </div>
-                  <p className="text-xs text-on-surface-variant">
-                    Uses {currentVoice} when creating a new narration task.
-                  </p>
-                </div>
-                <div className="w-full pt-2 border-t border-outline-variant hidden lg:block">
-                  <h3 className="text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">File Info</h3>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="text-outline">Format</div>
-                    <div className="text-on-surface font-semibold">Auto-detect</div>
-                    <div className="text-outline">Status</div>
-                    <div className="text-on-surface font-semibold">{currentTask?.status === "completed" ? "Ready" : currentTask?.status || "Idle"}</div>
-                  </div>
                 </div>
               </div>
             </div>
-          </section>
-        </aside>
+            {currentTask?.audio_url && (
+              <div className="border-t border-outline-variant/50">
+                <WaveformPlayer task={currentTask} onTimeUpdate={setCurrentTime} />
+              </div>
+            )}
+          </div>
+        </div>
 
-        <div className="flex-1 min-w-0 flex flex-col h-full">
-          <div data-reveal className="reveal-card hover-lift mt-stack-md lg:mt-0 bg-surface border border-outline-variant rounded-xl p-2 flex flex-wrap items-center gap-2 sticky top-[17rem] md:top-[12rem] lg:static z-20 shadow-sm mb-4">
+        <div className="px-margin-mobile md:px-0">
+        <div data-reveal className="reveal-card hover-lift bg-surface border border-outline-variant rounded-xl p-2 flex flex-wrap items-center gap-2 sticky top-0 z-20 shadow-sm shrink-0">
             <div className="flex items-center gap-1 border-r border-outline-variant pr-2">
               <button className="p-2 hover:bg-surface-container rounded-lg text-on-surface-variant" title="Bold" onMouseDown={(e) => e.preventDefault()} onClick={() => applyFormat("bold")}>
                 <span className="material-symbols-outlined">format_bold</span>
@@ -454,7 +536,19 @@ export default function EditorPage() {
                 <span className="material-symbols-outlined">redo</span>
               </button>
             </div>
-            <div className="ml-auto hidden md:flex items-center gap-2 px-3 py-1 bg-surface-container rounded-full">
+            <div className="flex items-center gap-1 border-r border-outline-variant pr-2">
+              <button
+                className={`p-2 rounded-lg transition-all ${isTranslationMode ? "bg-primary text-on-primary" : "hover:bg-surface-container text-on-surface-variant"}`}
+                title="Translate"
+                disabled={!segments.length || isTranslating}
+                onClick={() => void (isTranslationMode ? handleTranslateExit() : handleTranslate())}
+              >
+                <span className="material-symbols-outlined">
+                  {isTranslating ? "sync" : isTranslationMode ? "translate" : "g_translate"}
+                </span>
+              </button>
+            </div>
+            <div className={`${isTranslationMode ? "" : "ml-auto"} hidden md:flex items-center gap-2 px-3 py-1 bg-surface-container rounded-full`}>
               <span className="material-symbols-outlined text-sm text-secondary">check_circle</span>
               <span className="text-xs font-label-md text-on-surface-variant">
                 {isSaving ? "Saving..." : `Auto-saved ${formatRelativeTime(savedAt)}`}
@@ -462,48 +556,107 @@ export default function EditorPage() {
             </div>
           </div>
 
-          <div data-reveal className="reveal-card hover-lift bg-surface border border-outline-variant rounded-xl shadow-sm overflow-hidden flex-1 lg:overflow-y-auto mb-24 lg:mb-0 desktop-content-height">
-            <div className="p-gutter space-y-6">
-              {!segments.length ? (
-                <div className="p-8 text-center text-on-surface-variant">
-                  {isLoadingTask
-                    ? "Loading transcription..."
-                    : "Load a video or YouTube link to start editing the transcript."}
-                </div>
-              ) : (
-                segments.map((segment, index) => {
-                  const isActive = index === activeSegmentIndex;
-                  return (
-                    <div key={segment.id} className={`reveal-card hover-lift flex gap-4 p-4 rounded-lg group transition-all is-visible ${isActive ? 'active-row font-semibold bg-primary/5' : 'zebra-row'}`}>
-                      <div className={`min-w-[110px] font-code-md text-code-md mt-1 ${isActive ? "text-primary font-bold" : "text-primary opacity-60"}`}>
-                        {formatRange(segment.start, segment.end)}
-                      </div>
-                      <div className="flex-1 space-y-2">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`font-label-md px-2 py-0.5 rounded text-xs ${isActive ? "text-on-primary bg-primary" : "text-primary bg-primary-fixed"}`}>
-                            SPEAKER {segment.speaker}
-                          </span>
+          <div data-reveal className={`reveal-card hover-lift bg-surface border border-outline-variant rounded-xl shadow-sm overflow-hidden flex-1 lg:overflow-y-auto mb-24 lg:mb-0 desktop-content-height`}>
+            {isTranslationMode && (
+              <div className="sticky top-0 z-10 bg-surface border-b border-outline-variant px-gutter py-3 flex items-center gap-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Original</span>
+                <span className="material-symbols-outlined text-sm text-secondary">arrow_forward</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Translation</span>
+                {isTranslating && (
+                  <span className="ml-auto text-xs text-secondary animate-pulse">
+                    Loading CPU translator and translating...
+                  </span>
+                )}
+              </div>
+            )}
+            <div className={`${isTranslationMode ? "grid grid-cols-2 divide-x divide-outline-variant" : ""}`}>
+              <div className={`p-gutter space-y-6 ${isTranslationMode ? "overflow-y-auto max-h-[calc(100vh-160px)]" : ""}`}>
+                {!segments.length ? (
+                  <div className="p-8 text-center text-on-surface-variant">
+                    {isLoadingTask
+                      ? "Loading transcription..."
+                      : "Load a video or YouTube link to start editing the transcript."}
+                  </div>
+                ) : (
+                  segments.map((segment, index) => {
+                    const isActive = index === activeSegmentIndex;
+                    return (
+                      <div key={segment.id} className={`reveal-card hover-lift flex gap-4 p-4 rounded-lg group transition-all is-visible ${isActive ? 'active-row font-semibold bg-primary/5' : 'zebra-row'}`}>
+                        <div className="min-w-[110px] font-code-md text-code-md mt-1 text-primary opacity-60">
+                          {formatRange(segment.start, segment.end)}
                         </div>
-                        <div
-                          contentEditable
-                          data-segment-id={segment.id}
-                          suppressContentEditableWarning
-                          spellCheck={false}
-                          className={`outline-none focus:ring-2 focus:ring-primary/10 rounded p-1 text-body-md text-on-surface leading-relaxed`}
-                          dangerouslySetInnerHTML={{ __html: segment.html }}
-                          onFocus={() => setCurrentTime(segment.start)}
-                          onInput={(e) => updateSegmentHtml(segment.id, e.currentTarget.innerHTML)}
-                        />
+                        <div className="flex-1 space-y-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-label-md px-2 py-0.5 rounded text-xs text-primary bg-primary-fixed">
+                              SPEAKER {segment.speaker}
+                            </span>
+                          </div>
+                          {isTranslationMode ? (
+                            <div className="p-1 text-body-md text-on-surface leading-relaxed" dangerouslySetInnerHTML={{ __html: segment.html }} />
+                          ) : (
+                            <div
+                              contentEditable
+                              data-segment-id={segment.id}
+                              suppressContentEditableWarning
+                              spellCheck={false}
+                              className="outline-none focus:ring-2 focus:ring-primary/10 rounded p-1 text-body-md text-on-surface leading-relaxed"
+                              dangerouslySetInnerHTML={{ __html: segment.html }}
+                              onFocus={() => setCurrentTime(segment.start)}
+                              onInput={(e: React.FormEvent<HTMLDivElement>) => updateSegmentHtml(segment.id, e.currentTarget.innerHTML)}
+                            />
+                          )}
+                        </div>
                       </div>
+                    );
+                  })
+                )}
+              </div>
+              {isTranslationMode && (
+                <div className="p-gutter space-y-6 overflow-y-auto max-h-[calc(100vh-160px)] bg-surface-container-low/30">
+                  {translationSegments.length === 0 ? (
+                    <div className="p-8 text-center text-on-surface-variant">
+                      {isTranslating ? "Translating..." : "Click Translate to generate the translation."}
                     </div>
-                  );
-                })
+                  ) : (
+                    translationSegments.map((segment, index) => {
+                      const orig = segments[index];
+                      return (
+                        <div key={segment.id} className="flex gap-4 p-4 rounded-lg">
+                          <div className="min-w-[110px] font-code-md text-code-md mt-1 text-secondary opacity-60">
+                            {orig ? formatRange(orig.start, orig.end) : "—"}
+                          </div>
+                          <div className="flex-1 space-y-2">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-label-md px-2 py-0.5 rounded text-xs text-on-secondary bg-secondary/20">
+                                SPEAKER {segment.speaker}
+                              </span>
+                            </div>
+                            <div
+                              contentEditable
+                              data-segment-id={segment.id}
+                              suppressContentEditableWarning
+                              spellCheck={false}
+                              className="outline-none focus:ring-2 focus:ring-secondary/20 rounded p-1 text-body-md text-on-surface leading-relaxed"
+                              dangerouslySetInnerHTML={{ __html: segment.html }}
+                              onInput={(e) => {
+                                const html = e.currentTarget.innerHTML;
+                                setTranslationSegments((prev) => prev.map((s) => s.id === segment.id ? { ...s, html } : s));
+                                setIsDirty(true);
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                  <div className="h-12" />
+                </div>
               )}
+            </div>
               <div className="h-12 lg:h-24" />
             </div>
-          </div>
-        </div>
-      </main>
+      </div>
+      </div>
 
         <button
           className="fixed bottom-24 lg:bottom-20 right-margin-mobile md:right-margin-desktop z-40 bg-primary text-on-primary px-6 py-4 rounded-xl shadow-lg flex items-center gap-2 active:scale-90 transition-all hover:opacity-90 group"

@@ -266,3 +266,18 @@ body {
 .icon-filled {
   font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24;
 }
+
+/* Translation panel side-by-side */
+.translation-original {
+  scrollbar-width: thin;
+}
+
+.translation-result {
+  scrollbar-width: thin;
+}
+
+.translation-result:focus-within {
+  outline: 2px solid var(--color-secondary, #00687a);
+  outline-offset: -2px;
+  border-radius: 0.75rem;
+}
