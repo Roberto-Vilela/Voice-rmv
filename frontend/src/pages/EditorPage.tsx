@@ -207,6 +207,7 @@ export default function EditorPage() {
 
   useEffect(() => {
     if (isDirty) return;
+    if (isSourceRemoved) return;
     const newSegments = buildSegments(currentTask, draftText);
     setSegments(newSegments);
 
@@ -219,7 +220,7 @@ export default function EditorPage() {
       setTranslationSegments(restored);
       setIsTranslationMode(true);
     }
-  }, [currentTask, draftText, isDirty, taskContentKey]);
+  }, [currentTask, draftText, isDirty, isSourceRemoved, taskContentKey]);
 
   useEffect(() => {
     const root = revealScopeRef.current;
@@ -485,12 +486,18 @@ export default function EditorPage() {
          <div className="flex items-center gap-3">
           <button
             onClick={handleRemoveUpload}
-            className="hidden md:flex items-center gap-2 px-4 py-2 text-on-surface font-label-md hover:bg-secondary-container/20 rounded-xl transition-all"
-            disabled={!currentTask?.input_file && !currentTask?.input_url}
-            title="Remove current upload"
+            className="hidden md:flex items-center gap-2 px-4 py-2 text-on-surface font-label-md hover:bg-secondary-container/20 rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+            disabled={
+              !currentTask?.transcription &&
+              !currentTask?.input_text &&
+              !currentTask?.input_file &&
+              !currentTask?.input_url &&
+              !currentTask?.extra_data?.translated_text
+            }
+            title="Clear editor content"
           >
             <span className="material-symbols-outlined">delete</span>
-            <span>Remove source</span>
+            <span>Clear</span>
           </button>
           <button
             onClick={exportSrt}
