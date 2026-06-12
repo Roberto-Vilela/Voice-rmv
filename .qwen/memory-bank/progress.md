@@ -232,6 +232,74 @@ mas o WaveformPlayer continuava visivel e o audio continuava tocando.
 - Sempre verificar o efeito colateral completo (texto + player + audio)
   antes de marcar como validado.
 
+## 2026-06-12 — Envio de texto traduzido do Editor para Voice Over
+
+**Problema:** No Editor, após traduzir segmentos (inglês↔português), o texto
+traduzido ficava preso no Editor. Não havia como enviá-lo diretamente para o
+Voice Over para gerar narração TTS.
+
+**Solução:** Botão "Send to Voice Over" no EditorPage, visível apenas em modo
+tradução com conteúdo real. Usa `sessionStorage` para passar o texto ao
+VoiceOverPage, que pré-popula o textarea automaticamente.
+
+**Arquivos alterados:**
+- `frontend/src/pages/EditorPage.tsx` — `handleSendToVoiceOver` + botão na toolbar
+- `frontend/src/pages/VoiceOverPage.tsx` — `useEffect` para ler sessionStorage na montagem
+
+**Validacao humana:** ✅ Usuario confirmou que todos os testes passaram (35/35 pytest, npm run build).
+
+---
+
+## 2026-06-12 — Ambiente: credenciais via env vars
+
+**Problema:** `docker-compose.yml` e `config.py` tinham credenciais de dev
+hardcoded (`POSTGRES_PASSWORD`, `translation_controller_token`).
+
+**Solução:** Substituir por `${VAR-default}` pattern no docker-compose;
+`Field(validation_alias=...)` no config.py; `.env.example` documentado;
+security note no README.
+
+**Arquivos alterados:**
+- `docker-compose.yml` — POSTGRES_PASSWORD via env var
+- `backend/app/config.py` — Field com validation_alias
+- `.env.example` (x2) — documentação das vars
+- `README.md` — security note
+- `scripts/translation_model_controller.py` — já usava `os.environ.get` (inalterado)
+
+**Validacao humana:** Aprovado pelo usuario.
+
+---
+
+## 2026-06-12 — Padronizacao de estrutura para portfolio
+
+**Problema:** Repositório com estrutura amadora: backend todo em `app/`, sem
+separação por domínio, raiz com lixo (`=1.0.0`, `response.json`, `teste-*.mp3`),
+sem `docs/`, `examples/`, `LICENSE`.
+
+**Solução conservadora:**
+- `backend/src/` com módulos: `transcription/`, `voice_generation/`, `sync/`,
+  `utils/` — código copiado, `app/` mantido com re-exports (`from src.xxx import *`)
+- `docs/` (workflow, architecture, human_review), `examples/`, `assets/`
+- `LICENSE` MIT, `.gitignore` limpo, README atualizado
+- Lixo removido da raiz
+
+**Arquivos criados/movidos:**
+- `backend/src/transcription/`, `voice_generation/`, `sync/`, `utils/` (cada qual com `__init__.py`)
+- `backend/app/services/*.py` → re-exports
+- `backend/app/tasks/*.py` → re-exports
+- `docs/workflow.md`, `docs/architecture.md`, `docs/human_review.md`
+- `examples/sample_input.md`, `assets/workflow-diagram.png`
+- `LICENSE`
+
+**Testes:** `pytest backend/tests -v` — 35/35 passando (3 testes de transcriber
+tiveram que ter o mock path atualizado de `app.services.transcriber` →
+`src.transcription.transcriber` devido ao import *).
+`cd frontend && npm run build` — 0 erros.
+
+**Validacao humana:** ✅ Usuario confirmou que 35/35 pytest + npm run build passam.
+
+---
+
 ## Pendencias Conhecidas
 
 - Continuar os itens pendentes em `library_analise.md`.
