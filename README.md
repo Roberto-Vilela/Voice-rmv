@@ -63,7 +63,7 @@ Audio / Video Input
 | Backend | Python 3.14+, FastAPI, SQLAlchemy 2.0 (async) |
 | Task Queue | Celery + Redis |
 | Database | PostgreSQL |
-| TTS | edge-tts (Azure Cognitive Services, CPU, free) |
+| TTS | edge-tts (Microsoft Edge online text-to-speech service; no local GPU required) |
 | Transcription | faster-whisper (CPU, int8 quantized) |
 | Video download | yt-dlp |
 | Audio processing | ffmpeg |
@@ -180,7 +180,7 @@ voice-rmv/
 │   └── workflow-diagram.png
 ├── docker-compose.yml
 ├── .env.example
-└── output/                           # Generated audio files
+└── output/                           # Generated audio files (local, gitignored)
 ```
 
 ---
@@ -193,8 +193,11 @@ voice-rmv/
 | `REDIS_URL` | `redis://localhost:6379/0` | Required for Celery |
 | `OUTPUT_DIR` | `./output` | Generated narration + transcription files |
 | `TEMP_DIR` | `./temp` | Temporary working files (cleared after tasks) |
+| `POSTGRES_PASSWORD` | `voice_rmv_dev` | Local development password only |
+| `TRANSLATION_CONTROLLER_TOKEN` | unset | Required only when translation controller is enabled |
+| `API_KEY` | unset | Optional local API protection header (`X-API-Key`) |
 
-This repository uses environment variables for all sensitive configuration and does **not** include production secrets. Placeholder defaults shown in `docker-compose.yml` and `.env.example` are safe for local development only.
+Local defaults are for development only. Production secrets must be provided through environment variables and are **not** committed to this repository.
 
 ---
 
@@ -224,8 +227,9 @@ Current known limitations:
 
 - CPU-only inference — transcription and translation models run on CPU, which is slower than GPU
 - Single-worker Celery — no horizontal scaling configured
-- No authentication UI — API key must be passed via header
-- Translation requires a local LLM server (TranslateGemma) — not included in `docker compose up`
+- No authentication UI — API key must be passed via `X-API-Key` header
+- Online TTS dependency — voice generation uses the Microsoft Edge online service through edge-tts; requires internet availability
+- Translation is optional and requires a local LLM server (TranslateGemma) — not included in `docker compose up`
 - File-based storage — audio outputs are stored on disk, not in object storage
 
 ## Roadmap
