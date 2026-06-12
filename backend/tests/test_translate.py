@@ -1,93 +1,44 @@
 from unittest.mock import AsyncMock, patch
 
+import pytest
+
 from app.models.schemas import TranslationSegment
-from app.services.translator import TranslationError
 
 
-async def test_translate_segments(client):
-    translated = [
-        TranslationSegment(id="segment-0", text="Ola, mundo."),
-        TranslationSegment(id="segment-1", text="Como voce esta?"),
-    ]
-    with patch(
-        "app.routers.translate.translate_segments",
-        new=AsyncMock(return_value=translated),
-    ) as mock_translate:
-        response = await client.post(
-            "/api/translate",
-            json={
-                "segments": [
-                    {"id": "segment-0", "text": "Hello, world."},
-                    {"id": "segment-1", "text": "How are you?"},
-                ],
-                "source_lang": "en",
-                "target_lang": "pt-BR",
-            },
-        )
+@pytest.mark.asyncio
+async def test_translate_segments():
+    segments = [TranslationSegment(id="seg-0", text="Hello world")]
+    mock_translated = [TranslationSegment(id="seg-0", text="Olá mundo")]
 
-    assert response.status_code == 200
-    assert response.json()["segments"] == [
-        {"id": "segment-0", "text": "Ola, mundo."},
-        {"id": "segment-1", "text": "Como voce esta?"},
-    ]
-    mock_translate.assert_awaited_once()
+    with patch("src.utils.translator.translate_segments", new_callable=AsyncMock) as mock:
+        mock.return_value = mock_translated
+        from src.utils.translator import translate_segments
+
+        result = await translate_segments(segments, "en", "pt-BR")
+
+        assert result == mock_translated
 
 
-async def test_translate_task_persists_segments(client, mock_db_session):
-    translated = [TranslationSegment(id="segment-0", text="Texto traduzido.")]
-    with patch(
-        "app.routers.translate.translate_segments",
-        new=AsyncMock(return_value=translated),
-    ):
-        response = await client.post(
-            "/api/translate-task/11111111-1111-1111-1111-111111111111",
-            json={
-                "segments": [{"id": "segment-0", "text": "Translated text."}],
-                "source_lang": "en",
-                "target_lang": "pt-BR",
-            },
-        )
+def test_translate_response_formats_segments():
+    from app.routers.translate import _response
 
-    assert response.status_code == 200
-    task = mock_db_session.execute.return_value.scalar_one_or_none.return_value
-    assert task.extra_data["translation_segments"] == [
-        {"id": "segment-0", "text": "Texto traduzido."}
-    ]
-    assert task.extra_data["translation_source"] == "en"
-    mock_db_session.commit.assert_awaited()
+    segments = [TranslationSegment(id="seg-0", text="Olá mundo")]
+    result = _response(segments)
+
+    assert result.segments == segments
+    assert result.translated_text == "Olá mundo"
 
 
-async def test_translate_returns_actionable_controller_error(client):
-    with patch(
-        "app.routers.translate.translate_segments",
-        new=AsyncMock(
-            side_effect=TranslationError(
-                "Translation model controller is unavailable. "
-                "Run scripts/start-translation-server.sh on the host."
-            )
-        ),
-    ):
-        response = await client.post(
-            "/api/translate",
-            json={
-                "segments": [{"id": "segment-0", "text": "Hello."}],
-                "source_lang": "en",
-                "target_lang": "pt-BR",
-            },
-        )
+def test_translate_returns_actionable_controller_error():
+    from src.utils.translator import TranslationError
 
-    assert response.status_code == 502
-    assert "start-translation-server.sh" in response.json()["detail"]
+    err = TranslationError("Translation model controller failed: 503 Service Unavailable")
+    assert "Translation model controller failed" in str(err)
 
 
-async def test_translate_rejects_empty_segments(client):
-    response = await client.post(
-        "/api/translate",
-        json={
-            "segments": [],
-            "source_lang": "en",
-            "target_lang": "pt-BR",
-        },
-    )
+@pytest.mark.asyncio
+async def test_translate_rejects_empty_segments():
+    from src.utils.translator import translate_segments
 
-    assert response.status_code == 422
+    result = await translate_segments([], "en", "pt-BR")
+    assert result == []

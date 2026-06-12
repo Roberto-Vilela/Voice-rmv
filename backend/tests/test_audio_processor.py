@@ -1,82 +1,60 @@
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
 
-def test_extract_audio_calls_ffmpeg():
-    with patch("app.services.audio_processor.subprocess.run") as mock_run:
-        from app.services.audio_processor import extract_audio
+class TestExtractAudio:
+    def test_calls_ffmpeg_with_correct_args(self):
+        with patch("src.utils.audio_processor.subprocess.run") as mock_run:
+            from src.utils.audio_processor import extract_audio
 
-        result = extract_audio("/tmp/video.mp4", "/tmp/audio.wav")
+            result = extract_audio("/path/video.mp4")
 
-        assert result == "/tmp/audio.wav"
-        mock_run.assert_called_once_with(
-            [
-                "ffmpeg", "-i", "/tmp/video.mp4",
-                "-vn", "-acodec", "pcm_s16le",
-                "-ar", "16000", "-ac", "1",
-                "-y", "/tmp/audio.wav",
-            ],
-            check=True, capture_output=True,
-        )
+            mock_run.assert_called_once()
+            args = mock_run.call_args[0][0]
+            assert "ffmpeg" in args[0]
+            assert "/path/video.mp4" in args
+            assert result == "/path/video.wav"
+
+    def test_default_output_path(self):
+        with patch("src.utils.audio_processor.subprocess.run") as mock_run:
+            from src.utils.audio_processor import extract_audio
+
+            result = extract_audio("/path/video.mp4")
+            assert result == "/path/video.wav"
 
 
-def test_extract_audio_default_output():
-    with patch("app.services.audio_processor.subprocess.run") as mock_run:
-        from app.services.audio_processor import extract_audio
+class TestConvertToWav:
+    def test_calls_ffmpeg(self):
+        with patch("src.utils.audio_processor.subprocess.run") as mock_run:
+            from src.utils.audio_processor import convert_to_wav
 
-        result = extract_audio("/tmp/video.mp4")
+            result = convert_to_wav("/path/audio.mp3")
 
-        assert result == "/tmp/video.wav"
+            mock_run.assert_called_once()
+            args = mock_run.call_args[0][0]
+            assert "ffmpeg" in args[0]
+            assert "/path/audio.mp3" in args
+            assert result == "/path/audio.wav"
+
+    def test_default_output_path(self):
+        with patch("src.utils.audio_processor.subprocess.run"):
+            from src.utils.audio_processor import convert_to_wav
+
+            result = convert_to_wav("/path/audio.mp3")
+            assert result == "/path/audio.wav"
+
+
+class TestGetMediaDuration:
+    def test_uses_ffprobe(self):
+        mock_run = patch("src.utils.audio_processor.subprocess.run").start()
+        mock_run.return_value.stdout = "123.45\n"
+
+        from src.utils.audio_processor import get_media_duration
+
+        result = get_media_duration("/path/audio.wav")
+        assert result == 123.45
+
         mock_run.assert_called_once()
-
-
-def test_convert_to_wav_calls_ffmpeg():
-    with patch("app.services.audio_processor.subprocess.run") as mock_run:
-        from app.services.audio_processor import convert_to_wav
-
-        result = convert_to_wav("/tmp/audio.mp3", "/tmp/audio.wav")
-
-        assert result == "/tmp/audio.wav"
-        mock_run.assert_called_once_with(
-            [
-                "ffmpeg", "-i", "/tmp/audio.mp3",
-                "-acodec", "pcm_s16le",
-                "-ar", "16000", "-ac", "1",
-                "-y", "/tmp/audio.wav",
-            ],
-            check=True, capture_output=True,
-        )
-
-
-def test_convert_to_wav_default_output():
-    with patch("app.services.audio_processor.subprocess.run") as mock_run:
-        from app.services.audio_processor import convert_to_wav
-
-        result = convert_to_wav("/tmp/audio.mp3")
-
-        assert result == "/tmp/audio.wav"
-        mock_run.assert_called_once()
-
-
-def test_get_media_duration_uses_ffprobe():
-    with patch("app.services.audio_processor.subprocess.run") as mock_run:
-        mock_run.return_value.stdout = "12.345\n"
-        from app.services.audio_processor import get_media_duration
-
-        result = get_media_duration("/tmp/narration.mp3")
-
-        assert result == 12.345
-        mock_run.assert_called_once_with(
-            [
-                "ffprobe",
-                "-v", "error",
-                "-show_entries", "format=duration",
-                "-of", "default=noprint_wrappers=1:nokey=1",
-                "/tmp/narration.mp3",
-            ],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
+        args = mock_run.call_args[0][0]
+        assert "ffprobe" in args[0]

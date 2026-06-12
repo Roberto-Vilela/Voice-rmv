@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.schemas import TranslateRequest, TranslateResponse
 from app.models.task import Task
-from app.services.translator import TranslationError, translate_segments
+from src.utils.translator import TranslationError, translate_segments
 
 router = APIRouter(prefix="/api", tags=["translate"])
 

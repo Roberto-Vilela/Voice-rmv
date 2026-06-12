@@ -8,8 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.schemas import TaskListResponse, TaskResponse
 from app.models.task import Task
-from app.services.task_response import task_to_response
-from app.tasks.narration_tasks import narrate_video_url_task
+from src.utils.task_response import task_to_response
+from src.sync.narration_tasks import narrate_video_url_task
 
 
 class TaskPatchRequest(BaseModel):

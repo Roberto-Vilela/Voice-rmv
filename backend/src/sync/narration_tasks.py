@@ -2,11 +2,11 @@ from pathlib import Path
 
 from app.config import settings
 from app.database import update_task
-from app.services.audio_processor import convert_to_wav, extract_audio, get_media_duration
-from app.services.transcriber import transcribe
-from app.services.tts_engine import build_narration_segments, synthesize, synthesize_with_timing
-from app.services.video_downloader import download_video
-from app.tasks.celery_app import celery_app
+from src.utils.audio_processor import convert_to_wav, extract_audio, get_media_duration
+from src.transcription.transcriber import transcribe
+from src.voice_generation.tts_engine import build_narration_segments, synthesize, synthesize_with_timing
+from src.utils.video_downloader import download_video
+from src.sync.celery_app import celery_app
 from app.database import run_async
 from app.models.task import Task
 from sqlalchemy.orm import Session

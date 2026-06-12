@@ -21,7 +21,7 @@ def mock_whisper_model():
 
 def test_transcribe_returns_correct_structure(mock_whisper_model):
     with patch("src.transcription.transcriber.get_model", return_value=mock_whisper_model):
-        from app.services.transcriber import transcribe
+        from src.transcription.transcriber import transcribe
 
         result = transcribe("/fake/path.wav")
 
@@ -41,7 +41,7 @@ def test_transcribe_returns_correct_structure(mock_whisper_model):
 
 def test_transcribe_calls_get_model(mock_whisper_model):
     with patch("src.transcription.transcriber.get_model", return_value=mock_whisper_model) as mock_get:
-        from app.services.transcriber import transcribe
+        from src.transcription.transcriber import transcribe
 
         transcribe("/fake/path.wav")
 
@@ -53,7 +53,7 @@ def test_transcribe_empty_audio():
     model.transcribe.return_value = ([], MagicMock(duration=0.0, language="en"))
 
     with patch("src.transcription.transcriber.get_model", return_value=model):
-        from app.services.transcriber import transcribe
+        from src.transcription.transcriber import transcribe
 
         result = transcribe("/fake/silence.wav")
 

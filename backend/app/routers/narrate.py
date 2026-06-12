@@ -12,8 +12,8 @@ from app.models.schemas import (
     TaskResponse,
 )
 from app.models.task import Task
-from app.services.task_response import task_to_response
-from app.tasks.narration_tasks import (
+from src.utils.task_response import task_to_response
+from src.sync.narration_tasks import (
     narrate_audio_file_task,
     narrate_text_task,
     narrate_video_file_task,

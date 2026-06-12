@@ -9,7 +9,7 @@ from app.database import init_db
 from app.middleware.auth import verify_api_key
 from app.middleware.rate_limit_middleware import RateLimitMiddleware
 from app.routers import history, narrate, output, translate
-from app.services.tts_engine import list_voices
+from src.voice_generation.tts_engine import list_voices
 
 Path(settings.output_dir).mkdir(parents=True, exist_ok=True)
 Path(f"{settings.output_dir}/narrations").mkdir(parents=True, exist_ok=True)

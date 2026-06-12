@@ -1,104 +1,76 @@
-# Voice-RMV - Workflow Principal
+# Workflow — Voice-rmv
 
-Este e o ponto de entrada obrigatorio para qualquer tarefa no projeto.
+**Start here.** This is the official execution sequence and reference index.
 
-## Documentos Oficiais
+## Pipeline
 
-| Prioridade | Arquivo | Responsabilidade |
-|---|---|---|
-| 1 | `workflow_rules.md` | Regras normativas e gates obrigatorios |
-| 2 | `Workflow.md` | Sequencia operacional e indice de consulta |
-| 3 | `designer_rules.md` | Regras visuais para tarefas de interface |
-| 4 | `progress.md` | Estado atual e registro do trabalho validado |
+```
+POST /api/narrate/{text,upload,video-url}
+  → Task (pending)
+  → Celery task.delay()
+  → ffmpeg convert
+  → faster-whisper transcribe
+  → edge-tts synthesize
+  → Task (completed)
+```
 
-Em caso de divergencia, o documento de maior prioridade prevalece.
+Optionally: translation via local LLM server (POST `/api/translate`).
 
-## Ordem Obrigatoria de Leitura
+## Execution sequence (14 steps)
 
-1. Ler `Workflow.md`.
-2. Ler `workflow_rules.md`.
-3. Ler `progress.md`.
-4. Ler `designer_rules.md` quando a tarefa tocar frontend ou UX.
-5. Consultar somente as referencias tecnicas relacionadas ao escopo.
-6. Ler continuacoes apenas quando o indice do arquivo principal indicar necessidade.
+### Phase 1 — Analysis & planning (steps 1-6)
 
-## Workflow de 14 Passos
+1. **Entender input** — read request carefully, identify context/objective
+2. **Analisar código** — read relevant files, directory structure, existing patterns
+3. **Ver viabilidade** — assess complexity, constraints, dependencies
+4. **Consultar memory bank** — read `Workflow.md`, `workflow_rules.md`, `progress.md`, then only relevant references
+5. **Montar plano** — include every mandatory field defined in `workflow_rules.md`
+6. **Plano aprovado** — present plan to user and wait for explicit confirmation (`"OK"` or `"SIM"`) before proceeding
 
-### Fase 1 - Analise e planejamento
+### Phase 2 — Execution (step 7)
 
-1. Entender o pedido e o objetivo.
-2. Inspecionar codigo, estrutura e mudancas locais.
-3. Avaliar viabilidade, dependencias e riscos.
-4. Consultar os documentos oficiais e referencias tecnicas.
-5. Preparar o plano no formato obrigatorio de `workflow_rules.md`.
-6. Apresentar o plano e aguardar `SIM` ou `OK`.
+7. **Executar tarefa** — implement step by step, communicate progress at milestones, stay in scope
 
-### Fase 2 - Execucao
+### Phase 3 — Human validation (step 8 — CRITICAL)
 
-7. Executar somente o escopo aprovado e comunicar marcos relevantes.
+8. **Testes principais — listar para humano** — never run automated tests automatically.
+   Instead: list manual tests (URLs, inputs, expectations) and test commands for the user.
+   **STOP and wait for user validation** before continuing.
 
-### Fase 3 - Validacao humana
+### Phase 4 — Wrap-up (steps 9-14)
 
-8. Listar testes manuais e comandos de validacao. Nao executar testes
-   automatizados sem pedido expresso. Parar e aguardar o resultado humano.
+9. **Resumir com detalhes** — explain what was done, decisions, learnings
+10. **Concluir** — list modified/created files, confirm scope delivered
+11. **Refinar** — polish code, remove console.log, optimize Tailwind classes
+12. **Feedback para memory** — record validated work in `progress.md`
+13. **Atualizar workflow** — update workflow files only when the process actually changes
+14. **Atualizar índices** — review main files and numbered continuations
 
-### Fase 4 - Encerramento
+### Golden rules
 
-9. Resumir a implementacao e as decisoes.
-10. Confirmar arquivos e escopo entregues.
-11. Refinar somente o codigo pertencente ao escopo aprovado.
-12. Registrar o resultado validado em `progress.md`.
-13. Atualizar `Workflow.md` ou `workflow_rules.md` apenas se o processo mudou.
-14. Revisar indices, continuacoes e referencias afetadas.
+- ✅ Always list tests for human validation after implementation (step 8)
+- ✅ Wait for explicit user confirmation before proceeding
+- ✅ Preserve history through numbered continuation files
+- ❌ **Never** run automated tests automatically (only if user asks)
+- ❌ **Never** continue past step 8 without human validation
+- ❌ **Never** assume it works — human feedback is critical
 
-## Gate Antes de Editar
+## Continuations
 
-Nenhum arquivo pode ser alterado antes de:
+| Main file | Detail file |
+|-----------|-------------|
+| `progress.md` | [`progress_01.md`](./progress_01.md) (até 2026-06-10) |
+| `Workflow.md` | [`Workflow_01.md`](./Workflow_01.md) |
+| `workflow_rules.md` | [`workflow_rules_01.md`](./workflow_rules_01.md) |
+| `designer_rules.md` | [`designer_rules_01.md`](./designer_rules_01.md) |
 
-- concluir os passos 1 a 4;
-- apresentar todos os campos obrigatorios do plano;
-- receber aprovacao explicita com `SIM` ou `OK`.
+## Reference index
 
-Uma aprovacao dada antes de um plano completo nao libera execucao.
-
-## Gate Depois de Implementar
-
-Depois da implementacao:
-
-1. listar cenarios manuais, URLs, entradas e resultados esperados;
-2. listar comandos automatizados sem executa-los;
-3. parar;
-4. aguardar o usuario informar os resultados;
-5. somente depois executar os passos 9 a 14.
-
-## Referencias Tecnicas
-
-| Tema | Arquivo |
-|---|---|
-| Stack e dependencias | `techContext.md` |
-| Arquitetura e padroes | `systemPatterns.md` |
-| Contexto de produto | `productContext.md`, `projectbrief.md` |
-| Backend | `REPORTO_BACKEND_ANALISE_INDEX.md` |
-| Frontend | `FRONTEND_ANALYSIS_INDEX.md` |
-| Analise da Library | `library_analise.md` |
-| Analise da VoiceOverPage | `voiceoverpage_analise.md` |
-
-Esses arquivos sao referencias auxiliares. Eles nao substituem os quatro
-documentos oficiais e devem ser conferidos contra a codebase atual.
-
-## Continuacoes
-
-| Arquivo | Conteudo |
-|---|---|
-| `Workflow_01.md` | Workflow anterior, exemplos e learnings ate 2026-06-10 |
-
-## Regra de Rotacao
-
-Quando este arquivo se aproximar de 400 linhas:
-
-1. mover secoes historicas completas para `Workflow_NN.md`;
-2. nao dividir uma secao no meio;
-3. manter aqui apenas o processo vigente e o indice;
-4. atualizar esta tabela;
-5. validar links e referencias com busca textual.
-
+| File | Content |
+|------|---------|
+| `progress.md` | Current state and index of validated project history |
+| `workflow_rules.md` | Normative rules, mandatory plan format, approval and validation gates |
+| `designer_rules.md` | Current visual rules, tokens and UI patterns |
+| `techContext.md` | Stack versions, constraints, dependencies |
+| `REPORTO_BACKEND_ANALISE_INDEX.md` | Backend API endpoints, services, tests |
+| `FRONTEND_ANALYSIS_INDEX.md` | Frontend pages, components, routes, hooks |
