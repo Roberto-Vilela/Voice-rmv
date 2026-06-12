@@ -194,6 +194,13 @@ docker compose up -d celery_worker
 
 ---
 
+This repository uses environment variables for all sensitive configuration
+(database credentials, API keys, tokens) and does **not** include production
+secrets. Placeholder defaults shown in `docker-compose.yml` and `.env.example`
+are safe for local development only.
+
+---
+
 ## Tests
 
 ```bash

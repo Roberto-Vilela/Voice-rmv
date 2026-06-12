@@ -3,7 +3,7 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: voice_rmv
-      POSTGRES_PASSWORD: voice_rmv_dev
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD-voice_rmv_dev}
       POSTGRES_DB: voice_rmv
     ports:
       - "5432:5432"
@@ -32,7 +32,7 @@ services:
     ports:
       - "8456:8456"
     environment:
-      DATABASE_URL: postgresql+asyncpg://voice_rmv:voice_rmv_dev@postgres:5432/voice_rmv
+      DATABASE_URL: postgresql+asyncpg://voice_rmv:${POSTGRES_PASSWORD-voice_rmv_dev}@postgres:5432/voice_rmv
       REDIS_URL: redis://redis:6379/0
       OUTPUT_DIR: /output
       TEMP_DIR: /temp
@@ -40,7 +40,7 @@ services:
       API_KEY: ${API_KEY-}
       TRANSLATION_BASE_URL: http://host.docker.internal:11437/v1
       TRANSLATION_CONTROLLER_URL: http://host.docker.internal:11436
-      TRANSLATION_CONTROLLER_TOKEN: ${TRANSLATION_CONTROLLER_TOKEN-voice-rmv-local-controller}
+      TRANSLATION_CONTROLLER_TOKEN: ${TRANSLATION_CONTROLLER_TOKEN-}
       TRANSLATION_MODEL: translategemma-4b-cpu
       TRANSLATION_IDLE_TTL: 600
       TRANSLATION_CONTEXT_LENGTH: 4096
@@ -64,7 +64,7 @@ services:
       dockerfile: Dockerfile
     command: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=1
     environment:
-      DATABASE_URL: postgresql+asyncpg://voice_rmv:voice_rmv_dev@postgres:5432/voice_rmv
+      DATABASE_URL: postgresql+asyncpg://voice_rmv:${POSTGRES_PASSWORD-voice_rmv_dev}@postgres:5432/voice_rmv
       REDIS_URL: redis://redis:6379/0
       OUTPUT_DIR: /output
       TEMP_DIR: /temp
