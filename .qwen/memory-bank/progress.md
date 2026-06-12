@@ -15,6 +15,7 @@
 | 5 | Release v0.1.0 + GitHub Issues #1-#5 | Direct GitHub | ✅ |
 | 6 | Import migration (Issue #5): all internal imports → `src.*`; re-export compatibility layer; `task_response.py` → `src/utils/` | `a0e8d77` | ✅ |
 | 7 | Fix tests: video_downloader context manager mocking, translate async patching + import paths | `(this session)` | ✅ |
+| 8 | GitHub Actions CI: backend-tests + frontend-build workflow | `(this session)` | ✅ |
 
 ### Test results (current)
 
