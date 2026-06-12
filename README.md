@@ -136,36 +136,28 @@ docker compose up -d celery_worker
 
 ```
 ├── backend/
-│   ├── app/
-│   │   ├── main.py                  # FastAPI entry
-│   │   ├── config.py                # pydantic-settings
-│   │   ├── database.py              # SQLAlchemy async + sync engines
-│   │   ├── models/task.py           # Task ORM model
-│   │   ├── routers/narrate.py       # POST /api/narrate/*
-│   │   ├── routers/history.py       # GET/PATCH /api/tasks
-│   │   ├── services/
-│   │   │   ├── tts_engine.py        # edge-tts with WordBoundary timing
-│   │   │   ├── transcriber.py       # faster-whisper
-│   │   │   ├── audio_processor.py   # ffmpeg (extract, convert, duration)
-│   │   │   └── video_downloader.py  # yt-dlp
-│   │   └── tasks/
-│   │       ├── celery_app.py        # Celery config
-│   │       └── narration_tasks.py   # Tasks: video URL, audio file, video file
+│   ├── src/                          # Domain pipeline modules
+│   │   ├── transcription/            #   faster-whisper (speech-to-text)
+│   │   ├── voice_generation/         #   edge-tts (text-to-speech)
+│   │   ├── sync/                     #   Celery tasks + worker config
+│   │   └── utils/                    #   audio processing, download, translation
+│   ├── app/                          # FastAPI web layer
+│   │   ├── main.py, config.py, database.py
+│   │   ├── routers/, models/, middleware/
+│   │   └── services/ + tasks/        # re-exports from src/
 │   ├── tests/
 │   ├── Dockerfile
 │   └── requirements.txt
 ├── frontend/
-│   ├── src/
-│   │   ├── App.tsx                  # Router (7 pages)
-│   │   ├── api/client.ts            # HTTP client
-│   │   ├── api/hooks.ts             # TanStack Query hooks
-│   │   ├── pages/                   # Dashboard, Editor, Library, History, etc.
-│   │   ├── components/              # WaveformPlayer, TaskRow, AudioModal, etc.
-│   │   └── types.ts                 # Shared TypeScript types
-│   ├── Dockerfile
+│   ├── src/                          # React SPA
+│   │   ├── App.tsx, api/, pages/, components/, hooks/
 │   └── package.json
+├── docs/                             # Portfolio documentation
+├── examples/                         # Usage examples
+├── assets/                           # Diagrams and media
 ├── docker-compose.yml
-└── output/                          # Generated audio files
+├── .env.example
+└── output/                           # Generated audio files
 ```
 
 ---

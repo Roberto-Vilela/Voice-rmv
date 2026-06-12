@@ -27,11 +27,19 @@ frontend/node_modules/.vite/
 stitch-mcp.json
 *.pem
 *.key
-*.json
-*.yml
-*.yaml
 secrets/
 credentials/
+
+# Backup files
+*.bak
+
+# Coverage reports
+.coverage
+htmlcov/
+
+# IDE directories
+.idea/
+.vscode/
 
 # Notas pessoais do desenvolvedor / agentes (NÃO SUBIR)
 memory-bank/
