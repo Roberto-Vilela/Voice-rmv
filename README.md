@@ -1,34 +1,62 @@
-# Voice-rmv
+# Voice-RMV
 
-Multi-modal narration platform. Convert text, video URLs, audio files, or video files into narrated audio using AI-powered transcription and Text-to-Speech.
+**AI-assisted audio workflow platform for transcription, voice generation, and sync editing.**
 
----
-
-## Architecture
-
-```
-[Text] ──────────────────────────► edge-tts ────► Audio
-
-[Video URL] ─► yt-dlp ─► ffmpeg ─► whisper ─► edge-tts
-               (download)  (extract)  (transcribe)  (narrate)
-
-[Audio File] ───────────────────► whisper ─► edge-tts
-
-[Video File] ─► ffmpeg ─► whisper ─► edge-tts
-                (extract)  (transcribe)  (narrate)
-```
-
-**Flow (example: video URL):**
-
-1. Frontend → `POST /api/narrate/video-url` with `{ url, voice }`
-2. FastAPI creates `Task` record → enqueues Celery task
-3. Celery worker: download → extract audio → transcribe (whisper) → narrate (edge-tts)
-4. Frontend polls `GET /api/tasks/{id}` via TanStack Query
-5. Result: transcription + narrated audio player with editable transcript editor
+Voice-RMV is not just an AI audio tool. It is a documented, human-reviewed workflow system for turning fragmented audio production steps into a repeatable operational process.
 
 ---
 
-## Stack
+## Problem
+
+Audio and content workflows often become fragmented across disconnected tools: transcription in one place, voice generation in another, manual review handled separately, and synchronization managed ad hoc. There is no single source of truth, no repeatable process, and no governance layer between AI output and final delivery.
+
+## Solution
+
+Voice-RMV organizes the audio production process into a structured, traceable, and human-reviewed pipeline. Every AI-generated output — transcription, voice synthesis, timing alignment — passes through a manual validation checkpoint before it is considered final.
+
+The platform accepts **text, YouTube URLs, audio files, and video files** as input and produces **time-aligned narrated audio** with an editable transcript that can be corrected, translated, and re-synthesized.
+
+## Core Workflow
+
+```
+Audio / Video Input
+        │
+        ▼
+  Audio Extraction (ffmpeg)
+        │
+        ▼
+  Transcription (faster-whisper)
+        │
+        ▼
+  Human Transcript Review ◄── Editor with rich text + waveform sync
+        │
+        ▼
+  Voice Generation (edge-tts)
+        │
+        ▼
+  Sync Editing & Timing Alignment
+        │
+        ▼
+  Human Quality Check
+        │
+        ▼
+  Final Audio Asset
+        │
+        ▼
+  Export (SRT, MP3) / Re-use
+```
+
+## What This Project Demonstrates
+
+- **AI-assisted workflow design** — structured pipeline with defined stages
+- **Transcription workflow** — speech-to-text with language detection and word-level timestamps
+- **Voice generation workflow** — configurable TTS with speed, pitch, and volume control
+- **Audio synchronization logic** — segment alignment between original and narrated audio
+- **Human-in-the-loop validation** — mandatory review checkpoints at transcript and output stages
+- **Process documentation** — workflow, architecture, and human review guides in `docs/`
+- **Reusable operational structure** — domain-organized backend modules under `backend/src/`
+
+## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
@@ -36,12 +64,23 @@ Multi-modal narration platform. Convert text, video URLs, audio files, or video 
 | Task Queue | Celery + Redis |
 | Database | PostgreSQL |
 | TTS | edge-tts (Azure Cognitive Services, CPU, free) |
-| Transcription | faster-whisper (CPU, int8) |
+| Transcription | faster-whisper (CPU, int8 quantized) |
 | Video download | yt-dlp |
 | Audio processing | ffmpeg |
 | Frontend | React 19, TypeScript, Vite, Tailwind CSS v4 |
 | State / Data | TanStack Query, Axios |
-| Tests | pytest (backend) |
+| Tests | pytest (backend, mocked) |
+
+## Human Review & Governance
+
+Voice-RMV follows a **human-in-the-loop** model. AI-generated outputs are treated as **draft assets**, not final deliverables. The workflow includes manual validation checkpoints for:
+
+- **Transcription accuracy** — every transcript can be edited, formatted, and corrected before synthesis
+- **Voice output quality** — audio preview before accepting the generated narration
+- **Timing alignment** — segment boundaries are reviewed and adjustable
+- **Translation validation** — translated text is editable side-by-side with the original
+
+This design prevents uncontrolled automation and keeps operational responsibility with the human operator.
 
 ---
 
@@ -56,8 +95,6 @@ Multi-modal narration platform. Convert text, video URLs, audio files, or video 
 ```bash
 docker compose up -d
 ```
-
-Services:
 
 | Service | Port |
 |---------|------|
@@ -94,9 +131,14 @@ cd frontend && npm install && npm run dev
 ### Tests
 
 ```bash
-pytest backend/tests -v --cov=app          # mocked services, no infra needed
-cd frontend && npm run build               # type-check + bundle
-cd frontend && npm run lint                # ESLint
+# Backend (mocked, no services needed)
+pytest backend/tests -v --cov=app
+
+# Frontend (type-check + bundle)
+cd frontend && npm run build
+
+# Lint
+cd frontend && npm run lint
 ```
 
 ### Docker (rebuild after changes)
@@ -105,36 +147,12 @@ cd frontend && npm run lint                # ESLint
 docker compose up -d --build
 ```
 
-For Celery worker changes (no bind mount):
-
-```bash
-docker compose stop celery_worker
-docker compose rm celery_worker
-docker compose build celery_worker
-docker compose up -d celery_worker
-```
-
----
-
-## API Endpoints
-
-| Method | Route | Description |
-|--------|-------|-------------|
-| POST | `/api/narrate/text` | Text → narrated audio (sync) |
-| POST | `/api/narrate/video-url` | YouTube/video URL → narrated audio (async) |
-| POST | `/api/narrate/upload` | Audio/video file → narrated audio (async) |
-| GET | `/api/tasks` | Task history (paginated) |
-| GET | `/api/tasks/{id}` | Task status + progress |
-| PATCH | `/api/tasks/{id}` | Update task (transcription, display name) |
-| POST | `/api/tasks/{id}/duplicate` | Duplicate a task |
-| GET | `/api/output/{filename}` | Serve generated audio |
-| GET | `/api/voices` | List available edge-tts voices |
-
 ---
 
 ## Project Structure
 
 ```
+voice-rmv/
 ├── backend/
 │   ├── src/                          # Domain pipeline modules
 │   │   ├── transcription/            #   faster-whisper (speech-to-text)
@@ -153,25 +171,17 @@ docker compose up -d celery_worker
 │   │   ├── App.tsx, api/, pages/, components/, hooks/
 │   └── package.json
 ├── docs/                             # Portfolio documentation
+│   ├── workflow.md
+│   ├── architecture.md
+│   └── human_review.md
 ├── examples/                         # Usage examples
+│   └── sample_input.md
 ├── assets/                           # Diagrams and media
+│   └── workflow-diagram.png
 ├── docker-compose.yml
 ├── .env.example
 └── output/                           # Generated audio files
 ```
-
----
-
-## Key Features
-
-- **Multi-modal input**: text, YouTube URLs, audio files, video files
-- **Async processing**: Celery queue with real-time progress updates
-- **Transcription editor**: edit transcript with bold/italic/underline, auto-save, segment highlighting synced to audio
-- **Waveform player**: visual audio playback with progress tracking
-- **Portuguese voice support**: 15+ native PT-BR neural voices via edge-tts
-- **Language detection**: auto-detects input language for transcription
-- **Duplicate tasks**: re-process a video URL with different voice settings
-- **SRT export**: download transcript as SubRip subtitle format
 
 ---
 
@@ -184,12 +194,49 @@ docker compose up -d celery_worker
 | `OUTPUT_DIR` | `./output` | Generated narration + transcription files |
 | `TEMP_DIR` | `./temp` | Temporary working files (cleared after tasks) |
 
+This repository uses environment variables for all sensitive configuration and does **not** include production secrets. Placeholder defaults shown in `docker-compose.yml` and `.env.example` are safe for local development only.
+
 ---
 
-This repository uses environment variables for all sensitive configuration
-(database credentials, API keys, tokens) and does **not** include production
-secrets. Placeholder defaults shown in `docker-compose.yml` and `.env.example`
-are safe for local development only.
+## API Endpoints
+
+| Method | Route | Description |
+|--------|-------|-------------|
+| POST | `/api/narrate/text` | Text → narrated audio (sync) |
+| POST | `/api/narrate/video-url` | YouTube/video URL → narrated audio (async) |
+| POST | `/api/narrate/upload` | Audio/video file → narrated audio (async) |
+| GET | `/api/tasks` | Task history (paginated) |
+| GET | `/api/tasks/{id}` | Task status + progress |
+| PATCH | `/api/tasks/{id}` | Update task (transcription, display name) |
+| POST | `/api/tasks/{id}/duplicate` | Duplicate a task |
+| GET | `/api/output/{filename}` | Serve generated audio |
+| GET | `/api/voices` | List available edge-tts voices |
+| POST | `/api/translate` | Translate text segments |
+| POST | `/api/translate-task/{id}` | Translate and persist to task |
+
+---
+
+## Limitations
+
+This project is a **portfolio workflow prototype**. It is not a production SaaS, not a fully automated publishing system, and not intended to replace human audio review.
+
+Current known limitations:
+
+- CPU-only inference — transcription and translation models run on CPU, which is slower than GPU
+- Single-worker Celery — no horizontal scaling configured
+- No authentication UI — API key must be passed via header
+- Translation requires a local LLM server (TranslateGemma) — not included in `docker compose up`
+- File-based storage — audio outputs are stored on disk, not in object storage
+
+## Roadmap
+
+- Improve sync validation and timing alignment
+- Add batch processing for multiple files
+- Add structured logging and monitoring
+- Add UI layer for all workflow stages
+- Add export presets (SRT, transcript, audio formats)
+- Refactor internal imports from `app.*` to domain-based `src.*` modules
+- GPU acceleration for transcription and TTS
 
 ---
 
