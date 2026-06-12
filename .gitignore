@@ -31,7 +31,7 @@ secrets/
 credentials/
 
 # Backup files
-*.bak
+*.bak*
 
 # Coverage reports
 .coverage
