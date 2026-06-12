@@ -112,6 +112,22 @@ export default function WaveformPlayer({ task, onTimeUpdate }: Props) {
     };
   }, [task?.audio_url]);
 
+  useEffect(() => {
+    if (task?.audio_url) return;
+
+    const audio = audioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.currentTime = 0;
+    }
+
+    audioRef.current = null;
+    setPlaying(false);
+    setCurrentTime(0);
+    setDuration(0);
+    onTimeUpdate?.(0);
+  }, [task?.audio_url, onTimeUpdate]);
+
   // Efeito separado para controlar o loop de animação conforme o estado playing
   useEffect(() => {
     let rafId: number;

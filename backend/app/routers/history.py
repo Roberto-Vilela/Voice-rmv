@@ -16,6 +16,9 @@ class TaskPatchRequest(BaseModel):
     display_name: str | None = None
     transcription: str | None = None
     extra_data: dict | None = None
+    input_file: str | None = None
+    input_url: str | None = None
+    audio_path: str | None = None
 
 router = APIRouter(prefix="/api", tags=["history"])
 
@@ -88,13 +91,22 @@ async def patch_task(task_id: UUID, body: TaskPatchRequest, db: AsyncSession = D
     task = result.scalar_one_or_none()
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
-    extra = task.extra_data or {}
-    if body.display_name is not None:
-        extra["display_name"] = body.display_name
-    if body.extra_data:
-        extra.update(body.extra_data)
-    if body.transcription is not None:
-        task.transcription = body.transcription
+    payload = body.model_dump(exclude_unset=True)
+    extra = dict(task.extra_data or {})
+
+    if "display_name" in payload:
+        extra["display_name"] = payload["display_name"]
+    if "extra_data" in payload and payload["extra_data"]:
+        extra.update(payload["extra_data"])
+    if "transcription" in payload:
+        task.transcription = payload["transcription"]
+    if "input_file" in payload:
+        task.input_file = payload["input_file"]
+    if "input_url" in payload:
+        task.input_url = payload["input_url"]
+    if "audio_path" in payload:
+        task.audio_path = payload["audio_path"]
+
     task.extra_data = extra
     await db.commit()
     await db.refresh(task)

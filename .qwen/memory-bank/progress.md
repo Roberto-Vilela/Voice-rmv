@@ -123,6 +123,13 @@ registro historico continua atual.
 - ✅ Fluxo: Upload → Remove → Player limpa → Task permanece na biblioteca
 - ✅ Design system tokens reutilizados
 
+**Correcao posterior (2026-06-11):** A validacao de "Player limpa" foi
+INCORRETA. Testes posteriores mostraram que o player nao limpava — o texto
+sumia mas o audio continuava tocando. A causa era o uso de
+`invalidateQueries` (assincrono, nao atualiza cache imediatamente) em vez de
+`setQueryData` com o retorno do PATCH. Ver entrada "2026-06-11 — Correcao:
+Remove source (player nao limpava)" para o estado atual.
+
 **Testes automatizados:** Nao solicitados (fluxo manual validado).
 
 ---
@@ -178,11 +185,60 @@ unavailable or the CPU model did not finish loading" por tres causas:
 geracao ~5 tok/s. Texto de 50k chars (~12k tokens) leva ~5-10 min total.
 Chunk 1000 chars (~250 tok) gera em ~50s por requisicao.
 
+## 2026-06-11 — Correcao: Remove source (player nao limpava)
+
+**Problema:** Clicar "Remove source" no Editor limpava o texto (`setSegments([])`)
+mas o WaveformPlayer continuava visivel e o audio continuava tocando.
+
+**Diagnostico:**
+- `handleRemoveUpload` chamava `patchTask` que retorna a task atualizada com
+  `audio_url: null`, mas o retorno era descartado
+- Em vez de usar o retorno, chamava `queryClient.invalidateQueries` que e
+  ASSINCRONO — marca o cache como stale e agenda refetch, mas o dado antigo
+  permanece no cache ate o refetch completar
+- Nesse gap, `currentTaskData` ainda tem `audio_url` preenchido, entao:
+  - `{currentTask?.audio_url && <WaveformPlayer>}` continua truthy
+  - `WaveformPlayer.tsx:67` (`if (!task?.audio_url) return`) nunca dispara
+  - O `useEffect` do Audio nunca executa cleanup (`audio.pause()`)
+
+**Tentativa de correcao (nao validada):**
+- `EditorPage.tsx:399-410`: capturar retorno do PATCH e usar
+  `queryClient.setQueryData(["task", id], result)` para atualizar o cache
+  IMEDIATAMENTE (sincrono), antes de `setSegments([])` e `setCurrentTime(0)`
+- `queryClient.invalidateQueries` foi removido — `setQueryData` ja atualiza
+  o cache, e o refetch em background nao e necessario (o PATCH ja e a fonte
+  da verdade)
+
+**State apos correcao:**
+- TypeScript: `tsc --noEmit` passou (0 erros)
+- Lint: `npm run lint` falhou porque `eslint` nao esta instalado no container
+  (comportamento esperado conforme AGENTS.md)
+- Validacao humana: PENDENTE — usuario reportou "nao foi corrigido"
+- Possivel causa da falha: pode ser necessario restartar o container API para
+  refletir mudancas no backend (mas backend nao mudou), ou o cache do
+  navegador pode estar servindo dados velhos, ou a alteracao no frontend
+  pode precisar de rebuild do Vite
+
+**Arquivo alterado:**
+- `frontend/src/pages/EditorPage.tsx:399-410`
+
+**Licao aprendida:**
+- A entrada anterior em "2026-06-10 — Botao Remove source" registrava
+  "Player limpa" como validado, mas o teste foi superficial (so verificou
+  o texto, nao o player). Isso gerou um falso positivo no memory bank que
+  so foi descoberto quando o usuario testou com mais atencao.
+- `invalidateQueries` nao deve ser usado quando se tem o dado atualizado
+  em maos — `setQueryData` e sincrono e elimina o gap de stale cache.
+- Sempre verificar o efeito colateral completo (texto + player + audio)
+  antes de marcar como validado.
+
 ## Pendencias Conhecidas
 
 - Continuar os itens pendentes em `library_analise.md`.
 - Revisar debitos tecnicos apontados nos indices de frontend e backend.
 - Translation: testes automatizados em `backend/tests/test_translate.py` nunca executados.
+- **Remove source:** correcao aplicada mas nao validada pelo humano. Aguardando teste
+  manual para confirmar se o player limpa.
 
 ## Historico
 

@@ -145,3 +145,31 @@ class TestListTasks:
         data = resp.json()
         assert "tasks" in data
         assert "total" in data
+
+
+class TestPatchTask:
+    async def test_patch_task_can_clear_source_fields(self, client, mock_db_session):
+        task = mock_db_session.execute.return_value.scalar_one_or_none.return_value
+        task.input_file = "video.mp4"
+        task.input_url = "https://youtube.com/watch?v=test"
+        task.audio_path = "/tmp/output/narrations/audio.mp3"
+        task.extra_data = {"display_name": "Original title", "keep": "value"}
+
+        resp = await client.patch(
+            "/api/tasks/11111111-1111-1111-1111-111111111111",
+            json={
+                "transcription": "",
+                "input_file": None,
+                "input_url": None,
+                "audio_path": None,
+                "extra_data": {"display_name": ""},
+            },
+        )
+
+        assert resp.status_code == 200
+        assert task.transcription == ""
+        assert task.input_file is None
+        assert task.input_url is None
+        assert task.audio_path is None
+        assert task.extra_data == {"display_name": "", "keep": "value"}
+        mock_db_session.commit.assert_awaited()

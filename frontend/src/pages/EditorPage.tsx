@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import WaveformPlayer from "../components/WaveformPlayer";
 import { createUploadTask, createVideoUrlTask } from "../api/tasks";
 import { patchTask, translateTaskText, translateText } from "../api/client";
@@ -151,6 +152,7 @@ function buildSrt(segments: EditorSegment[]): string {
 export default function EditorPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const queryClient = useQueryClient();
   const taskId = searchParams.get("taskId");
   const draftText = searchParams.get("text") || "";
   const uploadInputRef = useRef<HTMLInputElement>(null);
@@ -165,6 +167,7 @@ export default function EditorPage() {
   const [isTranslationMode, setIsTranslationMode] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
   const [translationSegments, setTranslationSegments] = useState<EditorSegment[]>([]);
+  const [isSourceRemoved, setIsSourceRemoved] = useState(false);
 
   const { data: currentTaskData } = useTask(taskId);
   const { data: tasks = [] } = useTasks();
@@ -199,12 +202,23 @@ export default function EditorPage() {
     setCurrentTime(0);
     setIsTranslationMode(false);
     setTranslationSegments([]);
+    setIsSourceRemoved(false);
   }, [sourceKey]);
 
   useEffect(() => {
     if (isDirty) return;
     const newSegments = buildSegments(currentTask, draftText);
     setSegments(newSegments);
+
+    const savedTranslation = currentTask?.extra_data?.translation_segments;
+    if (Array.isArray(savedTranslation) && savedTranslation.length > 0 && newSegments.length > 0 && savedTranslation.length === newSegments.length) {
+      const restored = newSegments.map((seg) => {
+        const saved = savedTranslation.find((s: Record<string, unknown>) => s.id === seg.id);
+        return saved ? { ...seg, html: String(saved.html ?? "") } : seg;
+      });
+      setTranslationSegments(restored);
+      setIsTranslationMode(true);
+    }
   }, [currentTask, draftText, isDirty, taskContentKey]);
 
   useEffect(() => {
@@ -366,6 +380,7 @@ export default function EditorPage() {
       }));
       setTranslationSegments(newSegments);
       setIsTranslationMode(true);
+      setIsDirty(true);
     } catch (err: unknown) {
       setError(getErrorMessage(err, "Translation failed."));
     } finally {
@@ -378,23 +393,57 @@ export default function EditorPage() {
     setTranslationSegments([]);
   }, []);
 
+  const handleSendToVoiceOver = useCallback(() => {
+    const text = translationSegments
+      .map((seg) => stripHtml(seg.html).trim())
+      .filter(Boolean)
+      .join("\n\n");
+    if (!text) return;
+    sessionStorage.setItem("voiceOverText", text);
+    navigate("/voice-over");
+  }, [translationSegments, navigate]);
+
   const handleRemoveUpload = async () => {
     if (!currentTask?.id) return;
     setIsDirty(false);
     setIsSaving(true);
+    setIsSourceRemoved(true);
     try {
-      await patchTask(currentTask.id, {
+      const result = await patchTask(currentTask.id, {
         transcription: "",
+        input_file: null,
+        input_url: null,
+        audio_path: null,
         extra_data: {
           display_name: "",
           narration_segments: [],
           editor_segments: [],
-          audio_url: "",
+          translation_segments: [],
+          translated_text: "",
+        },
+      });
+      queryClient.setQueryData(["task", currentTask.id], {
+        ...result,
+        audio_url: null,
+        input_file: null,
+        input_url: null,
+        transcription: "",
+        extra_data: {
+          ...(result.extra_data || {}),
+          display_name: "",
+          narration_segments: [],
+          editor_segments: [],
+          translation_segments: [],
+          translated_text: "",
         },
       });
       setSegments([]);
+      setTranslationSegments([]);
+      setIsTranslationMode(false);
       setCurrentTime(0);
+      setError(null);
     } catch (err: unknown) {
+      setIsSourceRemoved(false);
       setError(getErrorMessage(err, "Failed to remove upload."));
     } finally {
       setIsSaving(false);
@@ -507,7 +556,7 @@ export default function EditorPage() {
                 </div>
               </div>
             </div>
-            {currentTask?.audio_url && (
+            {!isSourceRemoved && currentTask?.audio_url && (
               <div className="border-t border-outline-variant/50">
                 <WaveformPlayer task={currentTask} onTimeUpdate={setCurrentTime} />
               </div>
@@ -548,6 +597,16 @@ export default function EditorPage() {
                 </span>
               </button>
             </div>
+            {isTranslationMode && translationSegments.length > 0 && translationSegments.some((seg) => stripHtml(seg.html).trim()) && (
+              <button
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-secondary text-white hover:opacity-90 transition-all active:scale-95"
+                onClick={handleSendToVoiceOver}
+                title="Send translated text to Voice Over"
+              >
+                <span className="material-symbols-outlined text-lg">record_voice_over</span>
+                <span>Send to Voice Over</span>
+              </button>
+            )}
             <div className={`${isTranslationMode ? "" : "ml-auto"} hidden md:flex items-center gap-2 px-3 py-1 bg-surface-container rounded-full`}>
               <span className="material-symbols-outlined text-sm text-secondary">check_circle</span>
               <span className="text-xs font-label-md text-on-surface-variant">
@@ -668,7 +727,7 @@ export default function EditorPage() {
       </button>
 
       {error && (
-        <div className="fixed bottom-28 right-margin-mobile md:right-margin-desktop z-50 bg-error text-white px-4 py-3 rounded-xl shadow-lg max-w-sm">
+        <div className="fixed bottom-32 right-margin-mobile md:right-margin-desktop z-50 bg-error text-white px-4 py-3 rounded-xl shadow-lg max-w-sm">
           {error}
         </div>
       )}

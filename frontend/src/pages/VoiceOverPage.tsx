@@ -63,6 +63,14 @@ export default function VoiceOverPage() {
     return () => clearTimeout(timer);
   }, [error]);
 
+  useEffect(() => {
+    const stored = sessionStorage.getItem("voiceOverText");
+    if (stored) {
+      setScript(stored);
+      sessionStorage.removeItem("voiceOverText");
+    }
+  }, []);
+
   const personaVoices = useMemo(() => buildVoices(voices), [voices]);
   const featuredVoices = useMemo(() => personaVoices.slice(0, 4), [personaVoices]);
   const { isListening, transcript, start, stop, isSupported } = useSpeechToText();
