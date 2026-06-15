@@ -42,7 +42,15 @@ export async function duplicateTask(taskId: string) {
   return data;
 }
 
-export async function patchTask(taskId: string, body: { display_name?: string; transcription?: string; extra_data?: Record<string, unknown>; input_file?: string | null; input_url?: string | null; audio_path?: string | null }) {
+export async function patchTask(taskId: string, body: {
+  display_name?: string | null;
+  transcription?: string | null;
+  input_text?: string | null;
+  extra_data?: Record<string, unknown>;
+  input_file?: string | null;
+  input_url?: string | null;
+  audio_path?: string | null;
+}) {
   const { data } = await api.patch(`/tasks/${taskId}`, body);
   return data;
 }

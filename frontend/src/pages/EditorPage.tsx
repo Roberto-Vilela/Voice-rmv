@@ -79,6 +79,10 @@ function splitTextIntoChunks(text: string): string[] {
 }
 
 function buildSegments(task: Task | null, draftText: string): EditorSegment[] {
+  if (task?.extra_data?.source_removed === true) {
+    return [];
+  }
+
   const editorSegments = task?.extra_data?.editor_segments;
   const narrationSegments = task?.extra_data?.narration_segments;
   if (Array.isArray(narrationSegments) && narrationSegments.length > 0) {
@@ -409,35 +413,41 @@ export default function EditorPage() {
     setIsDirty(false);
     setIsSaving(true);
     setIsSourceRemoved(true);
+    const clearedExtraData = {
+      ...(currentTask.extra_data || {}),
+      display_name: "",
+      source_removed: true,
+      transcription_segments: [],
+      narration_segments: [],
+      editor_segments: [],
+      translation_segments: [],
+      translated_text: "",
+    };
     try {
       const result = await patchTask(currentTask.id, {
-        transcription: "",
-        input_file: null,
-        input_url: null,
-        audio_path: null,
-        extra_data: {
-          display_name: "",
-          narration_segments: [],
-          editor_segments: [],
-          translation_segments: [],
-          translated_text: "",
-        },
+        extra_data: clearedExtraData,
       });
-      queryClient.setQueryData(["task", currentTask.id], {
+      const clearedTask = {
         ...result,
-        audio_url: null,
-        input_file: null,
-        input_url: null,
-        transcription: "",
         extra_data: {
           ...(result.extra_data || {}),
-          display_name: "",
-          narration_segments: [],
-          editor_segments: [],
-          translation_segments: [],
-          translated_text: "",
+          ...clearedExtraData,
         },
-      });
+      };
+      queryClient.setQueryData(["task", currentTask.id], clearedTask);
+      queryClient.setQueryData(["tasks"], (currentTasks: Task[] | undefined) =>
+        currentTasks?.map((task) =>
+          task.id === currentTask.id
+            ? {
+                ...task,
+                extra_data: {
+                  ...(task.extra_data || {}),
+                  ...clearedExtraData,
+                },
+              }
+            : task,
+        ),
+      );
       setSegments([]);
       setTranslationSegments([]);
       setIsTranslationMode(false);
@@ -488,6 +498,7 @@ export default function EditorPage() {
             onClick={handleRemoveUpload}
             className="hidden md:flex items-center gap-2 px-4 py-2 text-on-surface font-label-md hover:bg-secondary-container/20 rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed"
             disabled={
+              currentTask?.extra_data?.source_removed === true ||
               !currentTask?.transcription &&
               !currentTask?.input_text &&
               !currentTask?.input_file &&
@@ -563,7 +574,7 @@ export default function EditorPage() {
                 </div>
               </div>
             </div>
-            {!isSourceRemoved && currentTask?.audio_url && (
+            {!isSourceRemoved && currentTask?.audio_url && currentTask?.extra_data?.source_removed !== true && (
               <div className="border-t border-outline-variant/50">
                 <WaveformPlayer task={currentTask} onTimeUpdate={setCurrentTime} />
               </div>

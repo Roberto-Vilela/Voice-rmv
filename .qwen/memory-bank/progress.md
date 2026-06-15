@@ -17,11 +17,15 @@
 | 7 | Fix tests: video_downloader context manager mocking, translate async patching + import paths | `(this session)` | ✅ |
 | 8 | GitHub Actions CI: backend-tests + frontend-build workflow | `(this session)` | ✅ |
 | 9 | Fix Clear button in EditorPage: enable for all task types, prevent segment rebuild after clear, add disabled visual style | `fa1b2bf` | ✅ |
+| 10 | Fix Clear/Remove Source regression: preserve Library identity while marking source as removed, stop editor rebuild via `source_removed` flag | `(this session)` | ✅ |
 
 ### Test results (current)
 
 - **Backend**: 35/35 pytest passed (0.12s)
 - **Frontend**: `npm run build` (tsc + vite) clean, 163 modules, 404.98 KB gzip: 124.99 KB
+- **Human validation**: Clear now removes editor content without turning the Library entry into `Untitled`; user confirmed the corrected flow
+- **Process note**: `erro_implementacao.md` was preserved as a reusable failure template and its task-specific contents were cleared after validation
+- **Reference doc**: [`botao_clear.md`](./botao_clear.md) contains the full implementation narrative, debugging path, and repair guide for future regressions
 
 ### Known issues (recorded as GitHub Issues)
 
@@ -39,3 +43,5 @@
 - Add screenshots/GIF demo to release
 - Create Notion case study (Problem, Workflow, My Role, Governance, Evidence, Learning, Next Steps)
 - Planar refactor: remove `app/services/*` and `app/tasks/*` compatibility layer
+- Preserve `erro_implementacao.md` as reusable failure template; clear task-specific incident content after validation
+- Keep `botao_clear.md` updated as the canonical guide for this regression pattern

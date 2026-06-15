@@ -5,6 +5,7 @@ export interface TaskExtraData {
   video_title?: string;
   source_url?: string;
   language?: string;
+  source_removed?: boolean;
   transcription_segments?: Array<{
     start?: number;
     end?: number;

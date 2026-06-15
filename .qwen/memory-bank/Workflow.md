@@ -46,6 +46,13 @@ Optionally: translation via local LLM server (POST `/api/translate`).
 13. **Atualizar workflow** — update workflow files only when the process actually changes
 14. **Atualizar índices** — review main files and numbered continuations
 
+### Documentation rule
+
+- Keep `progress.md` short and validated.
+- For non-trivial or recurring fixes, create a dedicated reference document that captures the full repair path.
+- Use `erro_implementacao.md` as the reusable template when an attempt fails.
+- Link the summary in `progress.md` to the dedicated reference document instead of expanding the progress log into a long narrative.
+
 ### Golden rules
 
 - ✅ Always list tests for human validation after implementation (step 8)

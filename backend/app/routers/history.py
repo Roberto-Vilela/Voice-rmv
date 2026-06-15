@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import attributes
 
 from app.database import get_db
 from app.models.schemas import TaskListResponse, TaskResponse
@@ -15,6 +16,7 @@ from src.sync.narration_tasks import narrate_video_url_task
 class TaskPatchRequest(BaseModel):
     display_name: str | None = None
     transcription: str | None = None
+    input_text: str | None = None
     extra_data: dict | None = None
     input_file: str | None = None
     input_url: str | None = None
@@ -100,6 +102,8 @@ async def patch_task(task_id: UUID, body: TaskPatchRequest, db: AsyncSession = D
         extra.update(payload["extra_data"])
     if "transcription" in payload:
         task.transcription = payload["transcription"]
+    if "input_text" in payload:
+        task.input_text = payload["input_text"]
     if "input_file" in payload:
         task.input_file = payload["input_file"]
     if "input_url" in payload:
@@ -108,6 +112,7 @@ async def patch_task(task_id: UUID, body: TaskPatchRequest, db: AsyncSession = D
         task.audio_path = payload["audio_path"]
 
     task.extra_data = extra
+    attributes.flag_modified(task, "extra_data")
     await db.commit()
     await db.refresh(task)
     return task_to_response(task)

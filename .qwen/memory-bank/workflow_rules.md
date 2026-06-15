@@ -39,3 +39,12 @@ Every plan presented to the user (step 5) MUST include:
 - Use numbered continuation files for large documents (`progress_01.md`, `progress_02.md`, etc.)
 - Never overwrite validated history — append or branch
 - Record all validated work in `progress.md` after human confirmation
+
+## 6. Documentation as system memory
+
+- `progress.md` MUST stay concise and act as the validated index of work completed.
+- Every validated bug or implementation pattern SHOULD have a dedicated reference document when the fix is non-trivial or likely to recur.
+- The dedicated document MUST explain the problem, root cause, failed attempts, final fix, and the checks a junior developer should perform if it returns.
+- `erro_implementacao.md` MUST remain as a reusable failure template for future unresolved attempts.
+- Do not force detailed incident history into `progress.md`; link to the dedicated reference document instead.
+- When a dedicated reference document exists, `progress.md` should summarize the outcome and point to that document.
