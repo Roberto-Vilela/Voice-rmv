@@ -34,8 +34,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt pytest pytest-asyncio httpx pytest-cov
 
+      - name: Debug backend environment
+        run: |
+          pwd
+          ls -la
+          python --version
+          python -m pytest --version
+
       - name: Run backend tests
-        run: python -m pytest tests -v
+        run: python -m pytest -v -ra --maxfail=1
 
   frontend-build:
     name: Frontend build
