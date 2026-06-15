@@ -42,7 +42,14 @@ jobs:
           python -m pytest --version
 
       - name: Run backend tests
-        run: python -m pytest -v -ra --maxfail=1
+        run: python -m pytest -v -ra --maxfail=1 2>&1 | tee pytest-backend.log
+
+      - name: Upload backend pytest log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-pytest-log
+          path: backend/pytest-backend.log
 
   frontend-build:
     name: Frontend build
