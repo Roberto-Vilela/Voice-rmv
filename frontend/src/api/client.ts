@@ -97,4 +97,44 @@ export async function getVoices() {
   return data;
 }
 
+export type SmartTranscriptionCapability = {
+  available: boolean;
+  device: string;
+  name: string | null;
+};
+
+export type ThemePreparationResponse = {
+  status: string;
+  theme: string;
+  exists: boolean;
+  valid: boolean;
+  source: string;
+  terms: number;
+  reason: string;
+};
+
+export async function getSmartTranscriptionCapability(): Promise<SmartTranscriptionCapability> {
+  const { data } = await api.get<SmartTranscriptionCapability>("/transcribe/gpu-check");
+  return data;
+}
+
+export async function prepareThemeVocabulary(theme: string): Promise<ThemePreparationResponse> {
+  const form = new FormData();
+  form.append("theme", theme);
+  const { data } = await api.post<ThemePreparationResponse>("/transcribe/prepare", form);
+  return data;
+}
+
+export async function downloadTaskAudio(taskId: string, filename: string) {
+  const res = await fetch(`/api/tasks/${taskId}/download`);
+  if (!res.ok) throw new Error("Download failed");
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export default api;

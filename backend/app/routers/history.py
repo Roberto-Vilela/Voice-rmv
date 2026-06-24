@@ -1,11 +1,14 @@
+from pathlib import Path
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import attributes
 
+from app.config import settings
 from app.database import get_db
 from app.models.schemas import TaskListResponse, TaskResponse
 from app.models.task import Task
@@ -116,3 +119,23 @@ async def patch_task(task_id: UUID, body: TaskPatchRequest, db: AsyncSession = D
     await db.commit()
     await db.refresh(task)
     return task_to_response(task)
+
+
+@router.get("/tasks/{task_id}/download")
+async def download_task_audio(task_id: UUID, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Task).where(Task.id == task_id))
+    task = result.scalar_one_or_none()
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if not task.audio_path:
+        raise HTTPException(status_code=404, detail="No audio available for this task")
+    audio = Path(task.audio_path)
+    if not audio.exists():
+        raise HTTPException(status_code=404, detail="Audio file not found on disk")
+    display = (task.extra_data or {}).get("display_name") or task.input_text or task.id
+    filename = f"{str(display).strip()[:80]}.mp3"
+    return FileResponse(
+        str(audio),
+        media_type="audio/mpeg",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

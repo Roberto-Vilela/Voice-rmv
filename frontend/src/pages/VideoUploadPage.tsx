@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { deleteTask } from "../api/client";
+import { deleteTask, downloadTaskAudio } from "../api/client";
 import { useTasks } from "../api/hooks";
 import { getErrorMessage } from "../utils/errors";
 import type { Task } from "../types";
@@ -118,6 +118,16 @@ export default function VideoUploadPage() {
       setError(getErrorMessage(err, "Failed to delete file."));
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleDownload = async (task: Task) => {
+    try {
+      const display = task.extra_data?.display_name || task.input_text || task.id;
+      const filename = `${String(display).slice(0, 80)}.mp3`;
+      await downloadTaskAudio(task.id, filename);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to download audio."));
     }
   };
 
@@ -295,7 +305,7 @@ export default function VideoUploadPage() {
                         <span className="material-symbols-outlined text-[20px]">share</span>
                       </button>
                       {task?.audio_url && (
-                        <button className="p-2 hover:bg-primary-fixed rounded-lg text-primary transition-colors" title="Download" onClick={() => window.open(task.audio_url, "_blank") }>
+                        <button className="p-2 hover:bg-primary-fixed rounded-lg text-primary transition-colors" title="Download" onClick={() => void handleDownload(task)}>
                           <span className="material-symbols-outlined text-[20px]">download</span>
                         </button>
                       )}

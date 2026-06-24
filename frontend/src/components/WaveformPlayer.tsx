@@ -31,7 +31,9 @@ export default function WaveformPlayer({ task, onTimeUpdate }: Props) {
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [playbackRate, setPlaybackRate] = useState(1);
   const barsRef = useRef<HTMLDivElement[]>([]);
+  const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
   useEffect(() => {
     const container = containerRef.current;
@@ -160,6 +162,35 @@ export default function WaveformPlayer({ task, onTimeUpdate }: Props) {
     }
   };
 
+  const handleSkipBack = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.currentTime = Math.max(0, audio.currentTime - 10);
+  };
+
+  const handleSkipForward = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 10);
+  };
+
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const time = Number(e.target.value);
+    const audio = audioRef.current;
+    if (audio) audio.currentTime = time;
+    setCurrentTime(time);
+    onTimeUpdate?.(time);
+  };
+
+  const cycleSpeed = () => {
+    const currentIndex = SPEEDS.indexOf(playbackRate);
+    const nextIndex = (currentIndex + 1) % SPEEDS.length;
+    const newSpeed = SPEEDS[nextIndex];
+    setPlaybackRate(newSpeed);
+    const audio = audioRef.current;
+    if (audio) audio.playbackRate = newSpeed;
+  };
+
   const handleRename = async () => {
     if (!task) return;
     const current = title;
@@ -198,8 +229,15 @@ export default function WaveformPlayer({ task, onTimeUpdate }: Props) {
       className="waveform-player relative bg-white p-6 rounded-2xl border border-outline-variant shadow-sm overflow-hidden"
       data-playing={playing ? "true" : "false"}
     >
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-4 min-w-0">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2 min-w-0">
+          <button
+            onClick={handleSkipBack}
+            className="w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container transition-colors shrink-0"
+            title="Retroceder 10s"
+          >
+            <span className="material-symbols-outlined">replay_10</span>
+          </button>
           <button
             data-editor-player-play-button="true"
             onClick={handlePlayPause}
@@ -209,14 +247,28 @@ export default function WaveformPlayer({ task, onTimeUpdate }: Props) {
               {playing ? "pause" : "play_arrow"}
             </span>
           </button>
-          <div className="min-w-0">
+          <button
+            onClick={handleSkipForward}
+            className="w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container transition-colors shrink-0"
+            title="Avançar 10s"
+          >
+            <span className="material-symbols-outlined">forward_10</span>
+          </button>
+          <div className="min-w-0 ml-2">
             <p className="text-label-md text-on-surface truncate">{title}</p>
             <p className="text-body-sm text-on-surface-variant">
               {formatTime(current)} / {formatTime(total)}
             </p>
           </div>
         </div>
-        <div className="flex gap-2 shrink-0">
+        <div className="flex gap-2 shrink-0 items-center">
+          <button
+            onClick={cycleSpeed}
+            className={`h-8 px-3 rounded-full text-xs font-semibold transition-colors shrink-0 ${playbackRate !== 1 ? "bg-primary text-on-primary" : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"}`}
+            title="Velocidade de reprodução"
+          >
+            {playbackRate}x
+          </button>
           <button
             onClick={handleRename}
             className="w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container transition-colors"
@@ -234,6 +286,17 @@ export default function WaveformPlayer({ task, onTimeUpdate }: Props) {
         </div>
       </div>
       <div ref={containerRef} className="flex items-end gap-0.5 h-16 w-full px-0.5" />
+      <div className="mt-3 px-0.5">
+        <input
+          type="range"
+          min={0}
+          max={total || 0}
+          step={0.1}
+          value={current}
+          onChange={handleSeek}
+          className="w-full h-2 rounded-full appearance-none cursor-pointer bg-surface-container-high accent-primary [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer"
+        />
+      </div>
     </section>
   );
 }

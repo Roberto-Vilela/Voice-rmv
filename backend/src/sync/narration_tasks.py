@@ -1,4 +1,5 @@
 from pathlib import Path
+import uuid
 
 from app.config import settings
 from app.database import update_task
@@ -15,7 +16,7 @@ from app.database import sync_engine
 
 def _get_task_by_id(task_id: str) -> dict:
     with Session(sync_engine) as session:
-        task = session.query(Task).filter(Task.id == task_id).first()
+        task = session.query(Task).filter(Task.id == uuid.UUID(task_id)).first()
         return task.extra_data or {}
 
 def _update_task_extra(task_id: str, new_data: dict):

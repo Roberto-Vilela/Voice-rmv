@@ -41,7 +41,7 @@ Optionally: translation via local LLM server (POST `/api/translate`).
 
 9. **Resumir com detalhes** — explain what was done, decisions, learnings
 10. **Concluir** — list modified/created files, confirm scope delivered
-11. **Refinar** — polish code, remove console.log, optimize Tailwind classes
+11. **Refinar** — check code standards, readability, repeated logic. No logic changes — see `workflow_rules.md §7`
 12. **Feedback para memory** — record validated work in `progress.md`
 13. **Atualizar workflow** — update workflow files only when the process actually changes
 14. **Atualizar índices** — review main files and numbered continuations

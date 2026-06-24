@@ -16,6 +16,7 @@ The final fix separates those concerns:
 - The Library still shows the original task identity.
 
 This file documents the full reasoning so another model or a junior developer can repeat the fix if the bug returns.
+It also serves as the pattern for how this project should document non-trivial fixes: short validated summary in `progress.md`, detailed guide in a dedicated reference file, and a reusable failure template in `erro_implementacao.md`.
 
 ---
 

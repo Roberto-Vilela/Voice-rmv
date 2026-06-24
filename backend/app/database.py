@@ -1,4 +1,5 @@
 import asyncio
+import uuid
 from sqlalchemy import create_engine, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Session, attributes
@@ -8,7 +9,8 @@ from app.config import settings
 engine = create_async_engine(settings.database_url, echo=False)
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
-sync_engine = create_engine(settings.database_url.replace("+asyncpg", "+psycopg2"))
+_sync_url = settings.database_url.replace("+asyncpg", "+psycopg2").replace("+aiosqlite", "+pysqlite")
+sync_engine = create_engine(_sync_url)
 sync_session = Session(sync_engine)
 
 
@@ -37,6 +39,8 @@ def run_async(coro):
 def update_task(task_id: str, **kwargs):
     from app.models.task import Task
 
+    _tid = uuid.UUID(task_id) if isinstance(task_id, str) else task_id
+
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
@@ -44,7 +48,7 @@ def update_task(task_id: str, **kwargs):
 
     if loop is None:
         with Session(sync_engine) as session:
-            task = session.query(Task).filter(Task.id == task_id).first()
+            task = session.query(Task).filter(Task.id == _tid).first()
             if task is None:
                 return
             for key, value in kwargs.items():
@@ -56,7 +60,7 @@ def update_task(task_id: str, **kwargs):
 
     async def _update():
         async with async_session() as session:
-            result = await session.execute(select(Task).where(Task.id == task_id))
+            result = await session.execute(select(Task).where(Task.id == _tid))
             task = result.scalar_one_or_none()
             if task is None:
                 return

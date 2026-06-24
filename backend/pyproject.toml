@@ -18,6 +18,7 @@ dependencies = [
     "pydantic-settings>=2.6.0",
     "python-multipart>=0.0.18",
     "aiofiles>=24.1.0",
+    "imageio-ffmpeg>=0.6.0",
 ]
 
 [project.optional-dependencies]

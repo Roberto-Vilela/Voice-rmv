@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import WaveformPlayer from "../components/WaveformPlayer";
 import { createUploadTask, createVideoUrlTask } from "../api/tasks";
-import { patchTask, translateTaskText, translateText } from "../api/client";
+import { patchTask, downloadTaskAudio, translateTaskText, translateText } from "../api/client";
 import { useTask, useTasks } from "../api/hooks";
 import { getErrorMessage } from "../utils/errors";
 import type { Task } from "../types";
@@ -353,6 +353,12 @@ export default function EditorPage() {
     URL.revokeObjectURL(url);
   };
 
+  const handleDownloadAudio = () => {
+    if (!currentTask?.audio_url) return;
+    const display = currentTask.extra_data?.display_name || currentTask.input_text || currentTask.id;
+    void downloadTaskAudio(currentTask.id, `${String(display).slice(0, 80)}.mp3`);
+  };
+
   const handleTranslate = useCallback(async () => {
     if (!segments.length) {
       setError("No transcription segments available. Wait for transcription to complete.");
@@ -517,6 +523,16 @@ export default function EditorPage() {
             <span className="material-symbols-outlined">file_download</span>
             Export
           </button>
+          {currentTask?.audio_url && (
+            <button
+              onClick={handleDownloadAudio}
+              className="flex items-center gap-2 px-4 py-2 text-primary font-label-md hover:bg-primary-container/20 rounded-xl transition-all"
+              title="Download audio"
+            >
+              <span className="material-symbols-outlined">download</span>
+              Audio
+            </button>
+          )}
         </div>
        </div>
 

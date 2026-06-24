@@ -8,7 +8,7 @@ from app.config import settings
 from app.database import init_db
 from app.middleware.auth import verify_api_key
 from app.middleware.rate_limit_middleware import RateLimitMiddleware
-from app.routers import history, narrate, output, translate
+from app.routers import history, narrate, output, transcribe, translate
 from src.voice_generation.tts_engine import list_voices
 
 Path(settings.output_dir).mkdir(parents=True, exist_ok=True)
@@ -44,6 +44,7 @@ app.add_middleware(RateLimitMiddleware)
 app.include_router(narrate.router, dependencies=[Depends(verify_api_key)])
 app.include_router(history.router, dependencies=[Depends(verify_api_key)])
 app.include_router(translate.router, dependencies=[Depends(verify_api_key)])
+app.include_router(transcribe.router, dependencies=[Depends(verify_api_key)])
 app.include_router(output.router)
 
 

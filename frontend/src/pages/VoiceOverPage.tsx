@@ -2,9 +2,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { createTextTask } from "../api/tasks";
 import { useTask, useVoices } from "../api/hooks";
-import { getTask } from "../api/client";
+import {
+  downloadTaskAudio,
+  getSmartTranscriptionCapability,
+  getTask,
+  prepareThemeVocabulary,
+} from "../api/client";
 import { getErrorMessage } from "../utils/errors";
 import { useSpeechToText } from "../hooks/useSpeechToText";
+import DictationModal from "../components/DictationModal";
 import WaveformPlayer from "../components/WaveformPlayer";
 import type { Task, Voice } from "../types";
 
@@ -55,6 +61,12 @@ export default function VoiceOverPage() {
   const [generatedTask, setGeneratedTask] = useState<Task | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalPhase, setModalPhase] = useState<"select" | "loading" | "ready">("select");
+  const [selectedTheme, setSelectedTheme] = useState<string | null>(null);
+  const [useGpu, setUseGpu] = useState(false);
+  const [smartTranscriptionAvailable, setSmartTranscriptionAvailable] = useState(false);
+  const scriptTextareaRef = useRef<HTMLTextAreaElement>(null);
   const revealScopeRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -71,9 +83,34 @@ export default function VoiceOverPage() {
     }
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    void getSmartTranscriptionCapability()
+      .then((capability) => {
+        if (!active) return;
+        setSmartTranscriptionAvailable(capability.available);
+        if (!capability.available) setUseGpu(false);
+      })
+      .catch(() => {
+        if (!active) return;
+        setSmartTranscriptionAvailable(false);
+        setUseGpu(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const personaVoices = useMemo(() => buildVoices(voices), [voices]);
   const featuredVoices = useMemo(() => personaVoices.slice(0, 4), [personaVoices]);
-  const { isListening, transcript, start, stop, isSupported } = useSpeechToText();
+  const { isListening, transcript, isProcessing, dictationError, start, stop, clearError, isSupported } = useSpeechToText();
+
+  useEffect(() => {
+    if (dictationError) {
+      setError(dictationError);
+      clearError();
+    }
+  }, [dictationError, clearError]);
 
   useEffect(() => {
     if (!loadedTask) return;
@@ -86,6 +123,7 @@ export default function VoiceOverPage() {
   useEffect(() => {
     if (transcript) {
       setScript((prev) => prev + (prev ? " " : "") + transcript);
+      scriptTextareaRef.current?.focus();
     }
   }, [transcript]);
 
@@ -112,6 +150,37 @@ export default function VoiceOverPage() {
 
   const characterCount = script.length;
   const previewTask = generatedTask || (loadedTask?.audio_url ? loadedTask : null);
+
+  const handleSelectTheme = async (theme: string) => {
+    setSelectedTheme(theme);
+    setModalPhase("loading");
+    const loadingStartedAt = Date.now();
+    try {
+      const result = await prepareThemeVocabulary(theme);
+      if (!result.valid && theme !== "outros") {
+        setError("We could not prepare this theme vocabulary right now. Try again in a moment.");
+        setModalOpen(false);
+        setModalPhase("select");
+        return;
+      }
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "We could not prepare the selected theme."));
+      setModalOpen(false);
+      setModalPhase("select");
+      return;
+    }
+    const elapsed = Date.now() - loadingStartedAt;
+    const minimumLoadingMs = 2500;
+    if (elapsed < minimumLoadingMs) {
+      await new Promise((resolve) => setTimeout(resolve, minimumLoadingMs - elapsed));
+    }
+    setModalPhase("ready");
+  };
+
+  const handleStartDictation = () => {
+    setModalOpen(false);
+    start(selectedTheme || "outros", useGpu);
+  };
 
   const autoFixScript = () => {
     const cleaned = script
@@ -172,6 +241,7 @@ export default function VoiceOverPage() {
               Paste or write your script here
             </label>
             <textarea
+              ref={scriptTextareaRef}
               id="script-input"
               className="w-full h-64 lg:h-[420px] bg-transparent border-none focus:ring-0 text-body-lg font-body-lg resize-none placeholder-outline-variant outline-none"
               placeholder="Start typing your story or paste a professional script here..."
@@ -185,13 +255,49 @@ export default function VoiceOverPage() {
               </span>
               <div className="flex gap-2">
                 {isSupported && (
-                  <button
-                    className={`p-2 rounded-lg transition-colors material-symbols-outlined ${isListening ? "bg-error/20 text-error animate-pulse" : "hover:bg-surface-container text-on-surface-variant"}`}
-                    onClick={() => (isListening ? stop() : start())}
-                    title={isListening ? "Stop recording" : "Speak to write"}
-                  >
-                    mic
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      className={`relative w-10 h-5 rounded-full transition-colors ${smartTranscriptionAvailable && useGpu ? "bg-primary" : "bg-outline-variant"}`}
+                      onClick={() => {
+                        if (!smartTranscriptionAvailable) {
+                          setError("Your machine does not support smart transcription.");
+                          return;
+                        }
+                        setUseGpu((v) => !v);
+                      }}
+                      title={smartTranscriptionAvailable ? "Enable smarter transcription" : "Smart transcription is not available on this machine"}
+                    >
+                      <span
+                        className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${smartTranscriptionAvailable && useGpu ? "translate-x-5" : "translate-x-0"}`}
+                      />
+                    </button>
+                    <div className="flex flex-col">
+                      <span className="text-label-sm text-on-surface-variant">Enable smarter transcription</span>
+                      {!smartTranscriptionAvailable && (
+                        <span className="text-[11px] text-outline">Your machine does not support smart transcription.</span>
+                      )}
+                    </div>
+                    {isListening && (
+                      <span className="text-label-sm text-error animate-pulse">Recording… tap to stop</span>
+                    )}
+                    <button
+                      className={`p-2 rounded-lg transition-colors material-symbols-outlined ${isListening ? "bg-error/20 text-error animate-pulse" : "hover:bg-surface-container text-on-surface-variant"}`}
+                      onClick={() => {
+                        if (isListening) {
+                          stop();
+                        } else if (isProcessing) {
+                          // ignore
+                        } else {
+                          setModalOpen(true);
+                          setModalPhase("select");
+                        }
+                      }}
+                      title={isListening ? "Stop recording" : "Dictate with high precision"}
+                    >
+                      {isProcessing ? "hourglass_top" : isListening ? "stop" : "mic"}
+                    </button>
+                  </>
                 )}
                 <button className="p-2 hover:bg-surface-container rounded-lg transition-colors material-symbols-outlined text-on-surface-variant" onClick={autoFixScript} title="Auto fix">
                   auto_fix_high
@@ -320,9 +426,21 @@ export default function VoiceOverPage() {
               <WaveformPlayer task={previewTask} />
             )}
             {previewTask?.audio_url && (
-              <button className="mt-4 text-primary text-label-md hover:underline" onClick={() => navigate(`/editor?taskId=${previewTask.id}`)}>
-                Open in Editor
-              </button>
+              <div className="mt-4 flex gap-3">
+                <button className="text-primary text-label-md hover:underline" onClick={() => navigate(`/editor?taskId=${previewTask.id}`)}>
+                  Open in Editor
+                </button>
+                <button
+                  className="text-primary text-label-md hover:underline flex items-center gap-1"
+                  onClick={() => {
+                    const display = previewTask?.extra_data?.display_name || previewTask?.input_text || previewTask?.id;
+                    void downloadTaskAudio(previewTask!.id, `${String(display).slice(0, 80)}.mp3`);
+                  }}
+                >
+                  <span className="material-symbols-outlined text-[16px]">download</span>
+                  Download
+                </button>
+              </div>
             )}
           </section>
 
@@ -339,6 +457,16 @@ export default function VoiceOverPage() {
           </button>
         </div>
       </main>
+
+      <DictationModal
+        open={modalOpen}
+        phase={modalPhase}
+        selectedTheme={selectedTheme}
+        smartModeEnabled={useGpu}
+        smartModeAvailable={smartTranscriptionAvailable}
+        onSelectTheme={handleSelectTheme}
+        onStart={handleStartDictation}
+      />
 
       {error && (
         <div className="toast-slide fixed bottom-28 right-margin-mobile md:right-margin-desktop z-50 bg-error text-white px-4 py-3 rounded-xl shadow-lg max-w-sm flex items-center gap-3">

@@ -40,7 +40,17 @@ Every plan presented to the user (step 5) MUST include:
 - Never overwrite validated history — append or branch
 - Record all validated work in `progress.md` after human confirmation
 
-## 6. Documentation as system memory
+## 7. Refinement rule (step 11)
+
+Refinement is NOT about changing approved code. It is about delivering code with **comments that are specific, clear, easy to understand, and contain references** to relevant context (issue numbers, function names, design decisions).
+
+Additionally:
+- Check that the code follows project standards (naming, imports, patterns)
+- Check for repeated logic that could be simplified
+- Verify that automated checks (typecheck, lint, build) still pass
+- **No logic changes** — if the model alters approved code during refinement, the human must redo the validation tests (step 8). Never skip validation after refinement changes.
+
+## 8. Documentation as system memory
 
 - `progress.md` MUST stay concise and act as the validated index of work completed.
 - Every validated bug or implementation pattern SHOULD have a dedicated reference document when the fix is non-trivial or likely to recur.

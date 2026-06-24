@@ -16,7 +16,9 @@ export default function AudioModal({ task, onClose }: Props) {
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [playbackRate, setPlaybackRate] = useState(1);
   const [bars, setBars] = useState<number[]>([]);
+  const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
   useEffect(() => {
     setBars(Array.from({ length: 60 }, () => Math.random() * 80 + 20));
@@ -77,8 +79,18 @@ export default function AudioModal({ task, onClose }: Props) {
           </button>
         </div>
 
-        <div className="px-6 py-4">
-          <div className="flex items-center gap-4">
+        <div className="px-6 py-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                const audio = audioRef.current;
+                if (audio) audio.currentTime = Math.max(0, audio.currentTime - 10);
+              }}
+              className="w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container transition-colors shrink-0"
+              title="Retroceder 10s"
+            >
+              <span className="material-symbols-outlined">replay_10</span>
+            </button>
             <button
               onClick={() => {
                 if (!audioRef.current) audioRef.current = new Audio(task.audio_url);
@@ -96,12 +108,50 @@ export default function AudioModal({ task, onClose }: Props) {
                 {playing ? "pause" : "play_arrow"}
               </span>
             </button>
-            <div className="min-w-0">
+            <button
+              onClick={() => {
+                const audio = audioRef.current;
+                if (audio) audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 10);
+              }}
+              className="w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container transition-colors shrink-0"
+              title="Avançar 10s"
+            >
+              <span className="material-symbols-outlined">forward_10</span>
+            </button>
+            <div className="min-w-0 ml-2">
               <p className="text-label-md text-on-surface-variant">
                 {String(Math.floor(currentTime / 60)).padStart(2, "0")}:{String(Math.floor(currentTime % 60)).padStart(2, "0")} / {String(Math.floor(duration / 60)).padStart(2, "0")}:{String(Math.floor(duration % 60)).padStart(2, "0")}
               </p>
             </div>
+            <button
+              onClick={() => {
+                const currentIndex = SPEEDS.indexOf(playbackRate);
+                const nextIndex = (currentIndex + 1) % SPEEDS.length;
+                const newSpeed = SPEEDS[nextIndex];
+                setPlaybackRate(newSpeed);
+                const audio = audioRef.current;
+                if (audio) audio.playbackRate = newSpeed;
+              }}
+              className={`ml-auto h-8 px-3 rounded-full text-xs font-semibold transition-colors shrink-0 ${playbackRate !== 1 ? "bg-primary text-on-primary" : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"}`}
+              title="Velocidade de reprodução"
+            >
+              {playbackRate}x
+            </button>
           </div>
+          <input
+            type="range"
+            min={0}
+            max={duration || 0}
+            step={0.1}
+            value={currentTime}
+            onChange={(e) => {
+              const time = Number(e.target.value);
+              const audio = audioRef.current;
+              if (audio) audio.currentTime = time;
+              setCurrentTime(time);
+            }}
+            className="w-full h-2 rounded-full appearance-none cursor-pointer bg-surface-container-high accent-primary [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer"
+          />
         </div>
 
         <div className="mx-6 mb-6 flex items-end gap-1 h-20 w-[calc(100%-3rem)] rounded-2xl bg-surface-container-low px-3 py-3 overflow-hidden">
