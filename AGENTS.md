@@ -3,7 +3,7 @@
 ## Dev
 
 ```bash
-docker compose up -d                        # postgres, redis, api:8456, celery_worker, frontend:5173
+docker compose up -d                        # postgres, redis, api:8456, celery_worker, frontend:5174
 docker compose up -d --build
 
 # Local backend

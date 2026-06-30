@@ -71,5 +71,8 @@ teste-*.mp3
 .DS_Store
 Thumbs.db
 
+# Redis
+dump.rdb
+
 # TypeScript incremental build cache
 *.tsbuildinfo

@@ -99,11 +99,11 @@ docker compose up -d
 | Service | Port |
 |---------|------|
 | API | `8456` |
-| Frontend | `5173` |
+| Frontend | `5174` |
 | PostgreSQL | `5432` |
 | Redis | `6379` |
 
-Frontend at `http://localhost:5173`. API proxied from `/api` to `localhost:8456`.
+Frontend at `http://localhost:5174`. API proxied from `/api` to `localhost:8456`.
 
 ### Health check
 

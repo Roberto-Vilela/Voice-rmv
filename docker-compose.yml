@@ -36,7 +36,7 @@ services:
       REDIS_URL: redis://redis:6379/0
       OUTPUT_DIR: /output
       TEMP_DIR: /temp
-      CORS_ORIGINS: http://localhost:5173,http://api:8456
+      CORS_ORIGINS: http://localhost:5174,http://api:8456
       API_KEY: ${API_KEY-}
       TRANSLATION_BASE_URL: http://host.docker.internal:11437/v1
       TRANSLATION_CONTROLLER_URL: http://host.docker.internal:11436

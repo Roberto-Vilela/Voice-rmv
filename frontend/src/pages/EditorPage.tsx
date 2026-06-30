@@ -353,10 +353,15 @@ export default function EditorPage() {
     URL.revokeObjectURL(url);
   };
 
-  const handleDownloadAudio = () => {
+  const handleDownloadAudio = async () => {
     if (!currentTask?.audio_url) return;
+    setError(null);
     const display = currentTask.extra_data?.display_name || currentTask.input_text || currentTask.id;
-    void downloadTaskAudio(currentTask.id, `${String(display).slice(0, 80)}.mp3`);
+    try {
+      await downloadTaskAudio(currentTask.id, `${String(display).slice(0, 80)}.mp3`);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to download audio."));
+    }
   };
 
   const handleTranslate = useCallback(async () => {

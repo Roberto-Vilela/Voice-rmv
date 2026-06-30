@@ -39,6 +39,27 @@
 - **Process note**: `erro_implementacao.md` was preserved as a reusable failure template and its task-specific contents were cleared after validation
 - **Reference doc**: [`botao_clear.md`](./botao_clear.md) contains the full implementation narrative, debugging path, and repair guide for future regressions
 
+### 2026-06-30 — Porta do frontend: 5173 → 5174
+
+Motivo: porta 5173 já estava em uso por outro projeto no host.
+
+O que foi alterado:
+- `frontend/vite.config.ts` já estava em **5174** (consistente)
+- `docker-compose.yml`: `CORS_ORIGINS` corrigido de `5173` para `5174`
+- `backend/app/config.py`: default `cors_origins` corrigido para `5174`
+- `AGENTS.md` e `README.md`: documentação atualizada para `5174`
+- Containers rebuildados com `docker compose up -d --build`
+
+### 2026-06-30 — Fix download no EditorPage
+
+**Root cause:** `Content-Disposition` header no endpoint `GET /api/tasks/{id}/download` continha caracteres Unicode (travessão `—`, aspas curvas) que não são latin-1 → `UnicodeEncodeError` → 500 → fetch não-ok → erro engolido por `void`.
+
+**O que foi alterado:**
+- `backend/app/routers/history.py`: sanitização do filename com `encode("ascii", errors="replace")` + fallback paths (mesmo padrão do `output.py`)
+- `frontend/src/pages/EditorPage.tsx`: `handleDownloadAudio` agora é async com try/catch e exibe erro no toast, ao invés de `void` silencioso
+
+**Validado:** curl retorna 200 com `audio/mpeg`.
+
 ### Reference docs
 
 | Doc | Content |

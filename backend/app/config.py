@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     output_dir: str = "./output"
     temp_dir: str = "./temp"
-    cors_origins: str = "http://localhost:5173,http://localhost:8456"
+    cors_origins: str = "http://localhost:5174,http://localhost:8456"
     api_key: str | None = None
     rate_limit_enabled: bool = True
     translation_base_url: str = "http://localhost:11437/v1"

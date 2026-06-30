@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 from uuid import UUID
 
@@ -127,15 +128,26 @@ async def download_task_audio(task_id: UUID, db: AsyncSession = Depends(get_db))
     task = result.scalar_one_or_none()
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
-    if not task.audio_path:
-        raise HTTPException(status_code=404, detail="No audio available for this task")
-    audio = Path(task.audio_path)
-    if not audio.exists():
+    filename_base = f"{task_id}.mp3"
+    possible_paths = [
+        Path(settings.output_dir) / "narrations" / filename_base,
+        Path(task.audio_path) if task.audio_path else None,
+        Path("/app/output") / "narrations" / filename_base,
+        Path("output") / "narrations" / filename_base,
+    ]
+    audio: Path | None = None
+    for p in possible_paths:
+        if p and p.exists() and p.is_file():
+            audio = p
+            break
+    if audio is None:
         raise HTTPException(status_code=404, detail="Audio file not found on disk")
     display = (task.extra_data or {}).get("display_name") or task.input_text or task.id
-    filename = f"{str(display).strip()[:80]}.mp3"
+    filename = str(display).strip()[:80]
+    filename = filename.encode("ascii", errors="replace").decode("ascii")
+    filename = re.sub(r'[^\w\-. ]+', "_", filename).strip() or f"audio-{task_id}"
     return FileResponse(
         str(audio),
         media_type="audio/mpeg",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": f'attachment; filename="{filename}.mp3"'},
     )
