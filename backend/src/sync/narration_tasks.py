@@ -5,8 +5,9 @@ from app.config import settings
 from app.database import update_task
 from src.utils.audio_processor import convert_to_wav, extract_audio, get_media_duration
 from src.transcription.transcriber import transcribe
-from src.voice_generation.tts_engine import build_narration_segments, synthesize, synthesize_with_timing
+from src.voice_generation.tts_engine import build_narration_segments, synthesize_with_timing
 from src.utils.video_downloader import download_video
+import re
 from src.sync.celery_app import celery_app
 from app.database import run_async
 from app.models.task import Task
@@ -45,16 +46,36 @@ def narrate_text_task(self, text: str, voice: str, task_id: str, speed: float = 
     try:
         update_task(task_id, status="processing", progress=10)
 
-        audio_bytes = run_async(synthesize(text, voice, speed=speed, pitch=pitch, volume=volume))
-        narration_path = _save_narration_audio(task_id, audio_bytes)
+        synthesis = run_async(synthesize_with_timing(text, voice, speed=speed, pitch=pitch, volume=volume))
+        narration_path = _save_narration_audio(task_id, synthesis["audio"])
+        narration_duration = get_media_duration(narration_path)
 
-        _update_task_extra(task_id, {"input_text": text})
+        sentences = re.split(r'(?<=[.!?])\s+', text.strip())
+        sentences = [s.strip() for s in sentences if s.strip()]
+        if not sentences:
+            words = text.strip().split()
+            chunk_size = max(1, len(words) // max(1, len(words) // 16))
+            sentences = [' '.join(words[i:i+chunk_size]) for i in range(0, len(words), chunk_size)]
+
+        source_segments = [{"text": s, "start": 0, "end": 0} for s in sentences]
+
+        narration_segments = build_narration_segments(
+            source_segments,
+            synthesis["word_boundaries"],
+            narration_duration,
+        )
+
+        _update_task_extra(task_id, {
+            "input_text": text,
+            "narration_segments": narration_segments,
+        })
 
         update_task(
             task_id,
             status="completed",
             progress=100,
             audio_path=narration_path,
+            duration_seconds=narration_duration,
             transcription=text,
         )
     except Exception as e:

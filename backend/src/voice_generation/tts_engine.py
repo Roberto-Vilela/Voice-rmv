@@ -43,8 +43,11 @@ async def synthesize(text: str, voice: str = "en-US-AriaNeural", speed: float | 
     return audio
 
 
-async def synthesize_with_timing(text: str, voice: str = "en-US-AriaNeural") -> dict:
-    communicate = edge_tts.Communicate(text, voice, boundary="WordBoundary")
+async def synthesize_with_timing(text: str, voice: str = "en-US-AriaNeural", speed: float | None = None, pitch: int | None = None, volume: float | None = None) -> dict:
+    rate = _rate_from_speed(speed) if speed is not None else "+0%"
+    pitch_str = _pitch_str(pitch) if pitch is not None else "+0Hz"
+    vol_str = _volume_str(volume) if volume is not None else "+0%"
+    communicate = edge_tts.Communicate(text, voice, rate=rate, pitch=pitch_str, volume=vol_str, boundary="WordBoundary")
     audio = bytearray()
     word_boundaries: list[dict] = []
     stream = communicate.stream()

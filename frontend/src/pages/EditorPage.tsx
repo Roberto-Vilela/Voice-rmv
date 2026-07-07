@@ -258,9 +258,11 @@ export default function EditorPage() {
 
   const [activeSegmentIndex, setActiveSegmentIndex] = useState(-1);
 
+  const SYNC_OFFSET = -2.0;
+
   useEffect(() => {
     const index = segments.findIndex(
-      (segment) => currentTime >= segment.start && currentTime < segment.end,
+      (segment) => currentTime - SYNC_OFFSET >= segment.start && currentTime - SYNC_OFFSET < segment.end,
     );
     setActiveSegmentIndex((current) => (current === index ? current : index));
   }, [currentTime, segments]);
