@@ -77,6 +77,30 @@ O que foi alterado:
 | #4 | Export presets (JSON, SRT, subtitle formats) | Open |
 | #5 | Remove app/services/ and app/tasks/ compatibility layer | Open |
 
+### 2026-07-06 — Fix sync audio/texto em text tasks (VoiceOverPage → Editor)
+
+**Problema:** `narrate_text_task` usava `synthesize()` sem WordBoundary, não gerava `narration_segments`, não salvava `duration_seconds`. Editor caía no fallback de segmentos uniformes — delay de 1-2s em textos longos.
+
+**O que foi feito:**
+- `tts_engine.py`: `synthesize_with_timing()` agora aceita `speed/pitch/volume`
+- `narration_tasks.py`: `narrate_text_task` usa `synthesize_with_timing()` → gera `narration_segments` via `build_narration_segments()` + salva `duration_seconds` (mesmo padrão já validado das tasks de vídeo/upload)
+- `EditorPage.tsx`: adicionado `SYNC_OFFSET = -2.0` no cálculo do `activeSegmentIndex` — compensa áudio estar adiantado vs destaque visual
+
+**Commit:** `537dbe5`
+**Arquivos:** 3 (backend/src/sync/narration_tasks.py, backend/src/voice_generation/tts_engine.py, frontend/src/pages/EditorPage.tsx)
+
+### 2026-07-19 — Port conflict resolution + frontend port change
+
+**Problema:** Containers `postgres` e `redis` do voice-rmv não iniciavam — portas `5432` e `6379` já ocupadas pelo projeto `opencut-classic`. API falhava com `Temporary failure in name resolution` → frontend recebia 500 em `/api/voices` e `/api/transcribe/gpu-check`.
+
+**O que foi alterado:**
+- `docker-compose.yml`: `5432:5432` → `5433:5432` (postgres host port)
+- `docker-compose.yml`: `6379:6379` → `6380:6379` (redis host port)
+- `docker-compose.yml`: `5174:5174` → `5001:5174` (frontend host port)
+- `docker-compose.yml`: `CORS_ORIGINS` atualizado de `localhost:5174` para `localhost:5001`
+
+**Validado:** `curl http://localhost:8456/api/voices` → 200 (lista de vozes), `curl http://localhost:5001/` → 200 (frontend), todos os 5 containers healthy.
+
 ### Next planned
 
 - Replace placeholder `assets/workflow-diagram.png` with real diagram

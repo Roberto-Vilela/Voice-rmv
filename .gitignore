@@ -76,3 +76,4 @@ dump.rdb
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+.flow-agent/
