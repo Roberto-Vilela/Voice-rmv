@@ -7,7 +7,7 @@ const apiTarget = process.env.API_PROXY_TARGET || "http://localhost:8456";
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
-    port: 5174,
+    port: 15174,
     proxy: {
       "/api": apiTarget,
     },

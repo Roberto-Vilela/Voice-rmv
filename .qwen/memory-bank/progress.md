@@ -101,6 +101,21 @@ O que foi alterado:
 
 **Validado:** `curl http://localhost:8456/api/voices` → 200 (lista de vozes), `curl http://localhost:5001/` → 200 (frontend), todos os 5 containers healthy.
 
+### 2026-11-13 — Porta do frontend: 5174 → 15174
+
+**Motivo:** a porta 5174 era usada/reservada por outros projetos (`AFV_STUDIO` e `English Coah - RMV`). A porta `15174` foi verificada livre no host e sem referências em outros projetos.
+
+**O que foi alterado:**
+- `frontend/vite.config.ts`: `port: 5174` → `port: 15174` (host, container e dev local)
+- `docker-compose.yml`: mapeamento `"5001:5174"` → `"15174:15174"`
+- `docker-compose.yml`: `CORS_ORIGINS` `localhost:5001` → `localhost:15174`
+- `backend/app/config.py`: default `cors_origins` `localhost:5174` → `localhost:15174`
+- `README.md` e `AGENTS.md`: documentação → `15174`
+- `.qwen/memory-bank/techContext.md` e `activeContext.md`: portas → `15174`
+- Containers `api` e `frontend` recriados com `docker compose up -d --force-recreate api frontend`
+
+**Validado:** Vite em `http://localhost:15174/`; API `8456` preservada; CORS alinhado. Validação humana confirmada.
+
 ### Next planned
 
 - Replace placeholder `assets/workflow-diagram.png` with real diagram
