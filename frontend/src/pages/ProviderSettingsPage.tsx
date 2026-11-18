@@ -1,13 +1,25 @@
-const TRANSLATOR_SETTINGS = [
-  ["Model", "TranslateGemma 4B Q4_K_M"],
-  ["Execution", "CPU only"],
-  ["Context", "4096 tokens"],
-  ["Concurrency", "1 translation"],
-  ["Idle unload", "60 seconds"],
-  ["API endpoint", "host.docker.internal:11435"],
-] as const;
+import { useQuery } from "@tanstack/react-query";
+import api from "../api/client";
+
+type TranslationConfig = {
+  model: string;
+  device: string;
+  context_length: number;
+  idle_ttl: number;
+};
 
 export default function ProviderSettingsPage() {
+  const { data: config, isError } = useQuery({
+    queryKey: ["translation-config"],
+    queryFn: async () => (await api.get<TranslationConfig>("/translate/config")).data,
+  });
+  const settings = config ? [
+    ["Model", config.model],
+    ["Execution", config.device.toUpperCase()],
+    ["Context", `${config.context_length} tokens`],
+    ["Concurrency", "1 translation"],
+    ["Idle unload", `${config.idle_ttl} seconds`],
+  ] : [];
   return (
     <div className="space-y-8 pb-24">
       <section className="relative overflow-hidden rounded-2xl bg-primary-container p-8 text-on-primary-container shadow-xl">
@@ -40,7 +52,8 @@ export default function ProviderSettingsPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {TRANSLATOR_SETTINGS.map(([label, value]) => (
+          {!config && <p role={isError ? "alert" : "status"}>{isError ? "Unable to load translation settings." : "Loading settings…"}</p>}
+          {settings.map(([label, value]) => (
             <div key={label} className="rounded-xl border border-outline-variant bg-surface p-4">
               <p className="text-label-sm uppercase tracking-wider text-on-surface-variant">{label}</p>
               <p className="mt-1 font-semibold text-on-surface">{value}</p>
@@ -56,8 +69,8 @@ export default function ProviderSettingsPage() {
         <div>
           <h3 className="font-bold text-on-secondary-container mb-1">Memory behavior</h3>
           <p className="text-body-md text-on-secondary-container/80 leading-relaxed">
-            The first translation loads the model into system RAM. After 60 seconds without
-            requests, LM Studio unloads it automatically. The main GPU model remains untouched.
+            The first translation loads the model into system RAM. The translation controller
+            unloads it after the idle interval shown above. Translation runs on CPU.
           </p>
         </div>
       </section>

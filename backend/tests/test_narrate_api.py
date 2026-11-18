@@ -1,4 +1,5 @@
 import pytest
+from unittest.mock import patch
 
 
 class TestHealth:
@@ -173,3 +174,27 @@ class TestPatchTask:
         assert task.audio_path is None
         assert task.extra_data == {"display_name": "", "keep": "value"}
         mock_db_session.commit.assert_awaited()
+
+
+async def test_duplicate_text_dispatches_worker(client, mock_db_session):
+    task = mock_db_session.execute.return_value.scalar_one_or_none.return_value
+    task.type = "text"
+    with patch("app.routers.history.narrate_text_task.delay") as delay:
+        response = await client.post(f"/api/tasks/{task.id}/duplicate")
+    assert response.status_code == 200
+    delay.assert_called_once_with(task.input_text, task.voice, response.json()["id"])
+
+
+async def test_transcribe_invalid_audio_returns_422_and_cleans_temp(client, monkeypatch, tmp_path):
+    import subprocess
+    from app.routers import transcribe
+
+    monkeypatch.setattr(transcribe.tempfile, "tempdir", str(tmp_path))
+    with patch("app.routers.transcribe.get_vocabulary", return_value=""), patch(
+        "app.routers.transcribe.subprocess.run",
+        side_effect=subprocess.CalledProcessError(1, "ffmpeg"),
+    ):
+        response = await client.post("/api/transcribe", files={"file": ("invalid.webm", b"invalid", "audio/webm")})
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Invalid or unsupported audio file."
+    assert list(tmp_path.iterdir()) == []

@@ -253,7 +253,6 @@ export default function EditorPage() {
       void saveChanges("auto");
     }, 1000);
     return () => window.clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [segments, isDirty, currentTask?.id]);
 
   const [activeSegmentIndex, setActiveSegmentIndex] = useState(-1);

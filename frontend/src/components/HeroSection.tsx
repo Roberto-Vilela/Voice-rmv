@@ -39,7 +39,7 @@ export default function HeroSection({
             clearInterval(pollingInterval);
             reject(new Error(updatedTask.error || "Processing failed"));
           }
-        } catch (err) {
+        } catch {
           // Ignore polling errors
         }
       }, 1000);

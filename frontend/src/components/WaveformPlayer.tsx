@@ -76,18 +76,6 @@ export default function WaveformPlayer({ task, onTimeUpdate }: Props) {
     setCurrentTime(0);
     setDuration(0);
 
-    let rafId: number;
-    const updateTime = () => {
-      if (audioRef.current) {
-        const time = audioRef.current.currentTime;
-        setCurrentTime(time);
-        onTimeUpdate?.(time);
-        if (playing) {
-          rafId = requestAnimationFrame(updateTime);
-        }
-      }
-    };
-
     const onPlay = () => setPlaying(true);
     const onPause = () => setPlaying(false);
     const onMeta = () => setDuration(audio.duration || 0);
@@ -95,7 +83,6 @@ export default function WaveformPlayer({ task, onTimeUpdate }: Props) {
       setPlaying(false);
       setCurrentTime(0);
       onTimeUpdate?.(0);
-      cancelAnimationFrame(rafId);
     };
 
     audio.addEventListener("play", onPlay);
@@ -105,7 +92,6 @@ export default function WaveformPlayer({ task, onTimeUpdate }: Props) {
     
     return () => {
       audio.pause();
-      cancelAnimationFrame(rafId);
       audio.removeEventListener("play", onPlay);
       audio.removeEventListener("pause", onPause);
       audio.removeEventListener("loadedmetadata", onMeta);
@@ -218,7 +204,13 @@ export default function WaveformPlayer({ task, onTimeUpdate }: Props) {
   if (!task || !task.audio_url) {
     return (
       <section className="waveform-player bg-white p-6 rounded-2xl border border-outline-variant shadow-sm overflow-hidden" ref={wrapperRef}>
-        <p className="text-body-sm text-on-surface-variant text-center">No audio yet. Upload or generate a narration to play here.</p>
+        {task?.status === "error" ? (
+          <p role="alert" className="text-body-sm text-error text-center">
+            {task.error || "Unable to generate audio. Please try again."}
+          </p>
+        ) : (
+          <p className="text-body-sm text-on-surface-variant text-center">No audio yet. Upload or generate a narration to play here.</p>
+        )}
       </section>
     );
   }

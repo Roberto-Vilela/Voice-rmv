@@ -14,7 +14,7 @@ export default function DashboardPage() {
 
   const latestCompleted = useMemo(() => {
     if (!Array.isArray(tasks)) return null;
-    return tasks.find((t: any) => t.audio_url) || null;
+    return tasks.find((t) => t.audio_url) || null;
   }, [tasks]);
 
   const playerTask = activeTask || latestCompleted;

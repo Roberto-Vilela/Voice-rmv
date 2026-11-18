@@ -2,7 +2,8 @@
 import json
 import logging
 import os
-import signal
+from pathlib import Path
+import shutil
 import socket
 import subprocess
 import threading
@@ -17,16 +18,30 @@ logging.basicConfig(
 )
 log = logging.getLogger("controller")
 
-MODEL_PATH = os.environ.get(
-    "TRANSLATION_MODEL_PATH",
-    "/home/roberto_vilela/.lmstudio/models/mradermacher/"
-    "translategemma-4b-it-GGUF/translategemma-4b-it.Q4_K_M.gguf",
-)
-LLAMA_SERVER = os.environ.get(
-    "TRANSLATION_LLAMA_SERVER",
-    "/tmp/.mount_LM-StugKWqsO/resources/app/.webpack/bin/extensions/"
-    "backends/llama.cpp-linux-x86_64-avx2-2.20.1/llama-server",
-)
+def _model_path() -> str:
+    configured = os.environ.get("TRANSLATION_MODEL_PATH")
+    if configured:
+        return str(Path(configured).expanduser())
+    root = Path(os.environ.get("LMSTUDIO_MODELS_DIR", str(Path.home() / ".lmstudio/models")))
+    matches = sorted(root.rglob("*translategemma*Q4_K_M.gguf"))
+    return str(matches[0]) if matches else ""
+
+
+def _llama_server_path() -> str:
+    configured = os.environ.get("TRANSLATION_LLAMA_SERVER")
+    if configured:
+        return str(Path(configured).expanduser())
+    installed = shutil.which("llama-server")
+    if installed:
+        return installed
+    backends = Path.home() / ".lmstudio/extensions/backends"
+    # Select the CPU backend, never a transient AppImage mount or GPU runtime.
+    matches = sorted(backends.glob("llama.cpp-linux-x86_64-avx2-*/llama-server"), key=lambda p: p.stat().st_mtime)
+    return str(matches[-1]) if matches else ""
+
+
+MODEL_PATH = _model_path()
+LLAMA_SERVER = _llama_server_path()
 TRANSLATION_API_PORT = int(os.environ.get("TRANSLATION_API_PORT", "11437"))
 MODEL_IDENTIFIER = os.environ.get(
     "TRANSLATION_MODEL_IDENTIFIER",
@@ -53,37 +68,29 @@ def _start_server() -> None:
         log.debug("Server already running, skipping start")
         return
     log.info("Starting llama-server...")
-    # Force-kill any leftover process on the port
-    try:
-        subprocess.run(
-            ["fuser", "-k", f"{TRANSLATION_API_PORT}/tcp"],
-            capture_output=True,
-            timeout=5,
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        pass
-    for i in range(20):
-        try:
-            with socket.create_connection(("127.0.0.1", TRANSLATION_API_PORT), timeout=0.5):
-                log.debug("Port %d still in use, retrying (%d/20)", TRANSLATION_API_PORT, i + 1)
-                time.sleep(0.5)
-        except (OSError, socket.timeout):
-            log.debug("Port %d is free", TRANSLATION_API_PORT)
-            break
+    if not MODEL_PATH or not Path(MODEL_PATH).is_file():
+        raise RuntimeError("Set TRANSLATION_MODEL_PATH to the installed TranslateGemma GGUF file.")
+    if not LLAMA_SERVER or not os.access(LLAMA_SERVER, os.X_OK):
+        raise RuntimeError("Set TRANSLATION_LLAMA_SERVER to an executable llama-server binary.")
+    if _port_in_use("127.0.0.1", TRANSLATION_API_PORT):
+        raise RuntimeError(f"Translation port {TRANSLATION_API_PORT} is already in use; no process was stopped.")
     _server_process = subprocess.Popen(
         [
             LLAMA_SERVER,
             "--model", MODEL_PATH,
+            "--alias", MODEL_IDENTIFIER,
+            "--n-gpu-layers", "0",
             "--ctx-size", str(CONTEXT_LENGTH),
             "--port", str(TRANSLATION_API_PORT),
             "--host", "0.0.0.0",
             "--no-jinja",
-            "--chat-template", "chatml",
+            # TranslateGemma is based on Gemma 3; ChatML uses incompatible turn tokens.
+            "--chat-template", "gemma",
             "--parallel", "1",
             "--no-warmup",
         ],
         stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stderr=None,
     )
 
 
@@ -95,12 +102,14 @@ def _stop_server() -> None:
     proc = _server_process
     _server_process = None
     log.info("Stopping llama-server (PID %d)...", proc.pid)
-    os.kill(proc.pid, signal.SIGTERM)
+    if proc.poll() is not None:
+        return
+    proc.terminate()
     try:
         proc.wait(timeout=10)
     except subprocess.TimeoutExpired:
         log.warning("Server did not respond to SIGTERM, sending SIGKILL")
-        os.kill(proc.pid, signal.SIGKILL)
+        proc.kill()
         proc.wait()
     log.debug("Process stopped, waiting for port release...")
     for i in range(20):
@@ -245,7 +254,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         try:
             self._send_json(200, ensure_model_loaded())
-        except (RuntimeError, subprocess.SubprocessError) as exc:
+        except (RuntimeError, OSError, subprocess.SubprocessError) as exc:
             self._send_json(503, {"detail": str(exc)})
 
     def log_message(self, format_string: str, *args: object) -> None:

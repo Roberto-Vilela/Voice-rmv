@@ -4,7 +4,7 @@ import os
 import subprocess
 import tempfile
 
-from fastapi import APIRouter, File, Form, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from src.transcription.transcriber import transcribe
 from src.transcription.vocabulary import get_vocabulary, prepare_vocabulary as prepare_theme_vocabulary
@@ -99,20 +99,16 @@ async def transcribe_audio(
 
     wav_path = webm_path + ".wav"
     try:
-        subprocess.run(
+        await asyncio.to_thread(subprocess.run,
             [
                 _FFMPEG_PATH, "-i", webm_path,
                 "-acodec", "pcm_s16le",
                 "-ar", "16000", "-ac", "1",
                 "-y", wav_path,
             ],
-            check=True, capture_output=True,
+            check=True, capture_output=True, timeout=60,
         )
-    finally:
-        os.unlink(webm_path)
-
-    try:
-        result = transcribe(
+        result = await asyncio.to_thread(transcribe,
             wav_path,
             language=whisper_lang,
             model_size=model_size,
@@ -121,5 +117,11 @@ async def transcribe_audio(
             initial_prompt=prompt or None,
         )
         return result
+    except subprocess.CalledProcessError as exc:
+        raise HTTPException(status_code=422, detail="Invalid or unsupported audio file.") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise HTTPException(status_code=422, detail="Audio conversion timed out.") from exc
     finally:
-        os.unlink(wav_path)
+        for path in (webm_path, wav_path):
+            if os.path.exists(path):
+                os.unlink(path)

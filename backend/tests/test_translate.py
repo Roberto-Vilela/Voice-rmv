@@ -42,3 +42,11 @@ async def test_translate_rejects_empty_segments():
 
     result = await translate_segments([], "en", "pt-BR")
     assert result == []
+
+
+async def test_translation_config_uses_effective_settings(client):
+    with patch("app.routers.translate.settings.translation_idle_ttl", 123):
+        response = await client.get("/api/translate/config")
+    assert response.status_code == 200
+    assert response.json()["idle_ttl"] == 123
+    assert "token" not in response.text

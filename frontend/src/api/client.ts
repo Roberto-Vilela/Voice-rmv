@@ -1,4 +1,5 @@
 import axios from "axios";
+import type { Task, Voice } from "../types";
 
 const api = axios.create({
   baseURL: "/api",
@@ -28,7 +29,7 @@ export async function getTask(taskId: string) {
 }
 
 export async function listTasks() {
-  const { data } = await api.get<{ tasks: any[]; total: number }>("/tasks");
+  const { data } = await api.get<{ tasks: Task[]; total: number }>("/tasks");
   return data.tasks;
 }
 
@@ -93,7 +94,7 @@ export async function translateTaskText(
 }
 
 export async function getVoices() {
-  const { data } = await api.get("/voices");
+  const { data } = await api.get<Voice[]>("/voices");
   return data;
 }
 

@@ -14,7 +14,7 @@ from app.database import get_db
 from app.models.schemas import TaskListResponse, TaskResponse
 from app.models.task import Task
 from src.utils.task_response import task_to_response
-from src.sync.narration_tasks import narrate_video_url_task
+from src.sync.narration_tasks import narrate_text_task, narrate_video_url_task
 
 
 class TaskPatchRequest(BaseModel):
@@ -70,6 +70,8 @@ async def duplicate_task(task_id: UUID, db: AsyncSession = Depends(get_db)):
 
     new_task = Task(
         type=original.type,
+        status="pending",
+        progress=0,
         voice=original.voice,
         input_text=original.input_text,
         input_url=original.input_url,
@@ -79,8 +81,10 @@ async def duplicate_task(task_id: UUID, db: AsyncSession = Depends(get_db)):
     await db.commit()
     await db.refresh(new_task)
 
-    # Re-dispatch celery for video_url tasks; upload tasks can't be re-processed (file deleted)
-    if original.type == "video_url" and original.input_url:
+    # Text and URL tasks retain their source; uploaded files may no longer exist.
+    if original.type == "text":
+        narrate_text_task.delay(original.input_text or "", original.voice, str(new_task.id))
+    elif original.type == "video_url" and original.input_url:
         narrate_video_url_task.delay(original.input_url, original.voice, str(new_task.id))
     elif original.type in ("audio_upload", "video_upload"):
         new_task.status = "error"

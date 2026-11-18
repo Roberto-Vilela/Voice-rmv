@@ -5,11 +5,23 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.config import settings
 from app.models.schemas import TranslateRequest, TranslateResponse
 from app.models.task import Task
 from src.utils.translator import TranslationError, translate_segments
 
 router = APIRouter(prefix="/api", tags=["translate"])
+
+
+@router.get("/translate/config")
+async def translation_config():
+    """Expose effective, non-secret settings for the provider screen."""
+    return {
+        "model": settings.translation_model,
+        "device": "cpu",
+        "context_length": settings.translation_context_length,
+        "idle_ttl": settings.translation_idle_ttl,
+    }
 
 
 def _response(segments) -> TranslateResponse:

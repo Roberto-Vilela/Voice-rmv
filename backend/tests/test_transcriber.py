@@ -35,6 +35,7 @@ def test_transcribe_returns_correct_structure(mock_whisper_model):
             "/fake/path.wav",
             task="transcribe",
             language=None,
+            initial_prompt=None,
             word_timestamps=True,
         )
 

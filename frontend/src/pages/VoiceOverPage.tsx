@@ -216,9 +216,10 @@ export default function VoiceOverPage() {
             setGeneratedTask(updated);
             setIsGenerating(false);
           }
-        } catch {
+        } catch (err: unknown) {
           clearInterval(poll);
           setIsGenerating(false);
+          setError(getErrorMessage(err, "Unable to check narration status. Please check History."));
         }
       }, 1000);
     } catch (err: unknown) {
@@ -434,7 +435,8 @@ export default function VoiceOverPage() {
                   className="text-primary text-label-md hover:underline flex items-center gap-1"
                   onClick={() => {
                     const display = previewTask?.extra_data?.display_name || previewTask?.input_text || previewTask?.id;
-                    void downloadTaskAudio(previewTask!.id, `${String(display).slice(0, 80)}.mp3`);
+                    void downloadTaskAudio(previewTask!.id, `${String(display).slice(0, 80)}.mp3`)
+                      .catch((err: unknown) => setError(getErrorMessage(err, "Unable to download audio.")));
                   }}
                 >
                   <span className="material-symbols-outlined text-[16px]">download</span>

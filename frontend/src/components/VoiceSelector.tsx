@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useVoices } from "../api/hooks";
 import api from "../api/client";
+import type { Task, Voice } from "../types";
 
 interface VoiceOption {
   name: string;
@@ -15,7 +16,7 @@ interface Props {
   variant?: "default" | "compact";
 }
 
-function formatLabel(v: VoiceOption): string {
+function formatLabel(v: Voice): string {
   const flag = v.locale.startsWith("pt") ? "🇧🇷" : "🇺🇸";
   const genderIcon = v.gender === "Female" ? "♀" : "♂";
   const short = v.name.replace("MultilingualNeural", "").replace("Neural", "");
@@ -46,12 +47,12 @@ export default function VoiceSelector({ value, onChange, variant = "default" }: 
   }, []);
 
   const ptVoices: VoiceOption[] = voices
-    .filter((v: any) => v.locale?.startsWith("pt"))
-    .map((v: any) => ({ ...v, label: formatLabel(v) }));
+    .filter((v) => v.locale?.startsWith("pt"))
+    .map((v) => ({ ...v, label: formatLabel(v) }));
 
   const enVoices: VoiceOption[] = voices
-    .filter((v: any) => v.locale?.startsWith("en"))
-    .map((v: any) => ({ ...v, label: formatLabel(v) }));
+    .filter((v) => v.locale?.startsWith("en"))
+    .map((v) => ({ ...v, label: formatLabel(v) }));
 
   const currentLabel = [...ptVoices, ...enVoices].find((v) => v.name === value)?.label || value;
 
@@ -63,8 +64,8 @@ export default function VoiceSelector({ value, onChange, variant = "default" }: 
     }
     setPlaying(v.name);
     try {
-      const res = await api.post("/narrate/text", { text: sampleText(v), voice: v.name });
-      const audioUrl = (res.data as any).audio_url;
+      const res = await api.post<Task>("/narrate/text", { text: sampleText(v), voice: v.name });
+      const audioUrl = res.data.audio_url;
       if (audioUrl) {
         const audio = new Audio(audioUrl);
         audioRef.current = audio;
