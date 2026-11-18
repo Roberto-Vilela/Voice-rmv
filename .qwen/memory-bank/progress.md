@@ -116,6 +116,24 @@ O que foi alterado:
 
 **Validado:** Vite em `http://localhost:15174/`; API `8456` preservada; CORS alinhado. Validação humana confirmada.
 
+### 2026-11-18 — Translation provider integration + transcription/task hardening
+
+**Commit:** `8e6003d` (push para `origin/main`).
+
+**O que foi entregue:**
+- `GET /api/translate/config` expõe configuração efetiva (model, device, context, idle TTL); tela Provider Settings passa a ler a API.
+- Controller de tradução robusto: systemd transient ou nohup, descoberta de caminhos, sem `fuser -k`, template Gemma, `--n-gpu-layers 0`; `docs/TRANSLATION_SETUP.md`.
+- Transcrição: ffmpeg/whisper fora do event loop, 422 em áudio inválido/timeout, limpeza de temp garantida.
+- Duplicar task de texto reenvia ao worker e reseta `status`/`progress`.
+- Frontend: ESLint + deps, tipagem de respostas, erros de task/download, remoção de rAF morto.
+- Deps: `edge-tts>=7.3.1,<8`.
+
+**Validação:**
+- Backend: 38/38 pytest passaram.
+- Frontend: `npm run build` e `npm run lint` limpos.
+- App: `docker compose up -d`; `/api/health` ok; `/api/translate/config` 200; `/api/voices` 200; frontend `15174` 200; proxy ok.
+- E2E: narração de texto concluiu em ~1s com `audio_url` + `narration_segments`; áudio `audio/mpeg` (21 KB) servido via API e proxy.
+
 ### Next planned
 
 - Replace placeholder `assets/workflow-diagram.png` with real diagram
